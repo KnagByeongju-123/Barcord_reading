@@ -286,13 +286,12 @@ function saveEntry(){
   hist.unshift(entry);if(hist.length>500)hist.length=500;
   localStorage.setItem('LOT_HIST',JSON.stringify(hist));
 
-  // 초기화
+  // 초기화 (바코드/수량/비고만, 항목 선택은 유지)
   pendingScan=null;
   document.getElementById('scanResult').classList.remove('show');
   document.getElementById('srImg').style.display='none';
   document.getElementById('inpQty').value='';
   document.getElementById('inpNote').value='';
-  cats.forEach((c,i)=>{document.getElementById('sel_'+i).value=''});
   showToast('✅ 등록 완료: '+entry.barcode);
 }
 
