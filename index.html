@@ -104,11 +104,12 @@
 
 <div class="res-area">
   <div class="last-r" id="lastR">
-    <div class="lr-lb">최근 스캔</div>
+    <div class="lr-lb">스캔 결과</div>
     <div class="lr-val" id="lrVal"></div>
     <div class="lr-fmt" id="lrFmt"></div>
     <div class="lr-tm" id="lrTm"></div>
     <div class="lr-acts">
+      <button style="flex:1.5;padding:10px;background:rgba(0,230,118,.2);color:var(--ok);border:1.5px solid rgba(0,230,118,.4);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit" onclick="registerLast()">✅ 이력 등록</button>
       <button class="btn-cp" onclick="copyLast()">📋 복사</button>
       <button class="btn-sr" onclick="searchLast()">🔍 검색</button>
     </div>
@@ -331,6 +332,8 @@ async function decode(){
 
 function clamp(v){return Math.max(0,Math.min(255,v|0))}
 
+let pendingCode=null; // 등록 대기 중인 스캔 결과
+
 function onDecoded(val,fmt){
   if(!val)return;
   const now=Date.now();
@@ -343,19 +346,35 @@ function onDecoded(val,fmt){
 
   const ts=new Date().toLocaleString('ko-KR');
   const fmtName=fmtN(fmt);
+
+  // 결과 표시
   document.getElementById('lrVal').textContent=val;
   document.getElementById('lrFmt').textContent='형식: '+fmtName;
   document.getElementById('lrTm').textContent=ts;
   document.getElementById('lastR').style.display='block';
 
-  hist.unshift({value:val,format:fmtName,time:ts,ts:now});
+  // 등록 대기
+  pendingCode={value:val,format:fmtName,time:ts,ts:now};
+
+  showToast('스캔 완료 — 등록 버튼을 눌러주세요');
+
+  if(!cont){scanning=false;setTimeout(()=>{scanning=true;scanLoop()},1500)}
+}
+
+function registerLast(){
+  if(!pendingCode){showToast('스캔된 바코드가 없습니다');return}
+
+  // 중복 체크 (같은 값이 이미 최근에 등록됐는지)
+  const dup=hist.find(h=>h.value===pendingCode.value&&h.ts===pendingCode.ts);
+  if(dup){showToast('이미 등록된 항목입니다');return}
+
+  hist.unshift({...pendingCode});
   if(hist.length>200)hist.length=200;
   localStorage.setItem('BC_HIST',JSON.stringify(hist));
   document.getElementById('scanCnt').textContent='스캔: '+hist.length+'건';
   renderHist();
-  showToast('✅ '+val);
-
-  if(!cont){scanning=false;setTimeout(()=>{scanning=true;scanLoop()},1500)}
+  showToast('✅ 등록완료: '+pendingCode.value);
+  pendingCode=null;
 }
 
 function fmtN(f){
