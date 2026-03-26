@@ -51,7 +51,7 @@
     .fd-label{font-size:9px;color:rgba(255,255,255,.6);min-width:28px;text-align:center;pointer-events:none}
     .fd-icon{font-size:10px;pointer-events:none}
     .s-ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
-    .s-box{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:65%;height:30%;border:2px solid #00d4ff;border-radius:10px;opacity:.4;transition:opacity .2s}
+    .s-box{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);width:85%;height:20%;border:2px solid #00d4ff;border-radius:10px;opacity:.4;transition:opacity .2s}
     .s-box.active{opacity:1}
     .s-box::before{content:'';position:absolute;top:-1px;left:8%;right:8%;height:2px;background:#00d4ff;box-shadow:0 0 12px #00d4ff;animation:sl 2s ease-in-out infinite;display:none}
     .s-box.active::before{display:block}
@@ -213,7 +213,7 @@ function dlF(c,fn,tp){const b=new Blob([c],{type:tp}),a=document.createElement('
 async function openScan(){
   document.getElementById('scanScreen').classList.add('active');
   document.body.style.overflow='hidden';
-  try{await screen.orientation.lock('landscape')}catch(e){}
+  // 세로 화면 유지
   if(!stream)await startCam();
 }
 function closeScan(){
@@ -222,7 +222,7 @@ function closeScan(){
   if(sharpInterval){clearInterval(sharpInterval);sharpInterval=null}
   document.getElementById('scanScreen').classList.remove('active');
   document.body.style.overflow='';
-  try{screen.orientation.unlock()}catch(e){}
+  // 세로 유지
   if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;track=null}
   renderHist();
 }
