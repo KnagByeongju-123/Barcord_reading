@@ -35,19 +35,21 @@
     /* 스캔 화면 */
     .scan-scr{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;z-index:1000;flex-direction:column}
     .scan-scr.active{display:flex}
-    .s-top{padding:8px 14px;display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.7);z-index:10}
+    .s-top{padding:8px 14px;display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.85);z-index:10;flex-shrink:0}
     .s-top span{font-size:12px;color:rgba(255,255,255,.8)}
     .s-back{padding:6px 12px;border:none;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
-    .s-cam{flex:1;position:relative;overflow:hidden}
+    .s-cam{flex:1;position:relative;overflow:hidden;background:#111}
     #reader{width:100%;height:100%}
-    #reader video{object-fit:cover!important}
+    #reader video{width:100%!important;height:100%!important;object-fit:cover!important}
+    #reader__scan_region{width:100%!important;height:100%!important}
+    #reader__scan_region video{width:100%!important;height:100%!important;object-fit:cover!important}
     /* html5-qrcode 기본 UI 숨기기 */
-    #reader__scan_region{position:relative!important}
-    #reader__scan_region img{display:none!important}
+    #reader__scan_region>img{display:none!important}
     #reader__dashboard{display:none!important}
     #reader__header_message{display:none!important}
+    #reader>div:last-child{display:none!important}
     .s-hint{position:absolute;bottom:8px;left:0;width:100%;text-align:center;font-size:12px;color:rgba(255,255,255,.7);z-index:15;pointer-events:none;text-shadow:0 1px 4px rgba(0,0,0,.8)}
-    .s-bot{padding:8px 14px;display:flex;justify-content:center;align-items:center;gap:10px;background:rgba(0,0,0,.7);z-index:10;flex-wrap:wrap}
+    .s-bot{padding:8px 14px;display:flex;justify-content:center;align-items:center;gap:10px;background:rgba(0,0,0,.85);z-index:10;flex-wrap:wrap;flex-shrink:0}
     .s-btn{padding:6px 14px;border:1.5px solid rgba(255,255,255,.3);border-radius:8px;background:rgba(0,0,0,.3);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
     .s-btn.on{border-color:#00d4ff;color:#00d4ff}
     .s-zm{display:flex;align-items:center;gap:4px}
@@ -163,15 +165,15 @@ async function startScanner(){
   const config={
     fps:30,
     qrbox:function(vw,vh){
-      const w=Math.floor(vw*0.95);
-      const h=Math.floor(vh*0.7);
+      // 세로화면 기준 가로 직사각형
+      const w=Math.floor(vw*0.9);
+      const h=Math.floor(w*0.35);
       return{width:w,height:h};
     },
-    aspectRatio:1.0,
     videoConstraints:{
       facingMode:'environment',
-      width:{ideal:3840,min:1920},
-      height:{ideal:2160,min:1080},
+      width:{ideal:1920},
+      height:{ideal:1080},
     },
     formatsToSupport:[
       Html5QrcodeSupportedFormats.CODE_39,
