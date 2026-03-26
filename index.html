@@ -36,12 +36,21 @@
     .scan-screen{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;z-index:1000}
     .scan-screen.active{display:block}
     #video{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
-    .s-tap{position:absolute;top:0;left:0;width:100%;height:100%;z-index:12;cursor:pointer}
+    .s-tap{position:absolute;top:0;left:0;width:100%;height:100%;z-index:12;cursor:pointer;touch-action:none}
     .focus-ring{position:absolute;width:50px;height:50px;border:2px solid #00d4ff;border-radius:50%;transform:translate(-50%,-50%) scale(1.5);opacity:0;transition:transform .3s,opacity .3s;pointer-events:none;z-index:13}
     .focus-ring.show{transform:translate(-50%,-50%) scale(1);opacity:1}
     .focus-border{position:absolute;top:0;left:0;width:100%;height:100%;border:3px solid transparent;pointer-events:none;z-index:11;transition:border-color .3s}
     .focus-border.sharp{border-color:#00e676;box-shadow:inset 0 0 20px rgba(0,230,118,.15)}
     .focus-border.mid{border-color:#ffc107}
+    /* focus peaking 오버레이 */
+    #peakCv{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:11;opacity:.6}
+    /* 초점 위치 인디케이터 (하단 바) */
+    .fd-bar{position:absolute;bottom:42px;left:50%;transform:translateX(-50%);width:50%;max-width:280px;height:28px;z-index:25;pointer-events:none;display:flex;align-items:center;gap:6px}
+    .fd-track{flex:1;height:3px;background:rgba(255,255,255,.15);border-radius:2px;position:relative}
+    .fd-fill{height:100%;background:linear-gradient(to right,#00d4ff,#00e676);border-radius:2px;transition:width .1s}
+    .fd-thumb{position:absolute;top:50%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:#00d4ff;border:2px solid #fff;box-shadow:0 0 8px rgba(0,212,255,.5);transition:left .1s}
+    .fd-label{font-size:9px;color:rgba(255,255,255,.6);min-width:28px;text-align:center;pointer-events:none}
+    .fd-icon{font-size:10px;pointer-events:none}
     .s-ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
     .s-box{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:65%;height:30%;border:2px solid #00d4ff;border-radius:10px;opacity:.4;transition:opacity .2s}
     .s-box.active{opacity:1}
@@ -123,13 +132,16 @@
   <div class="s-tap" id="tapArea"></div>
   <div class="focus-ring" id="focusRing"></div>
   <div class="focus-border" id="focusBorder"></div>
+  <canvas id="peakCv"></canvas>
+  <div class="fd-bar" id="fdBar" style="display:none">
+    <span class="fd-icon">🌸</span>
+    <div class="fd-track"><div class="fd-fill" id="fdFill" style="width:30%"></div><div class="fd-thumb" id="fdThumb" style="left:30%"></div></div>
+    <span class="fd-icon">🏔</span>
+    <span class="fd-label" id="fdLabel">--</span>
+  </div>
   <div class="sharp-m"><div class="sharp-f" id="sharpFill"></div></div>
   <div class="sharp-t" id="sharpText"></div>
-  <div class="mf-bar" id="mfBar">
-    <div class="mf-top"><span>🔍 수동초점</span><span class="mf-v" id="mfVal">--</span></div>
-    <input type="range" id="mfRange" min="0" max="1" step="0.01" value="0.3" oninput="setMfDist(this.value)">
-    <div class="mf-ft"><span>가까이</span><span>멀리</span></div>
-  </div>
+  <!-- MF는 좌우 스와이프로 제어 -->
   <div class="s-ov">
     <div class="s-box" id="scanBox">
       <div class="sc-c sc-tl"></div><div class="sc-c sc-tr"></div><div class="sc-c sc-bl"></div><div class="sc-c sc-br"></div>
@@ -139,7 +151,7 @@
     <button class="s-back" onclick="closeScan()">← 닫기</button>
     <span id="scanStatus">미리보기</span>
   </div>
-  <div class="s-hint" id="sHint">화면을 터치하면 1회 스캔합니다</div>
+  <div class="s-hint" id="sHint">좌우 스와이프 → 초점 조절 · 탭 → 1회 스캔</div>
   <div class="s-hud-bot">
     <button class="s-btn on" id="btnAF" onclick="toggleAF()">AF</button>
     <button class="s-btn" id="btnTorch" onclick="toggleTorch()">🔦</button>
@@ -241,26 +253,85 @@ async function startCam(){
   }
   await applyFocus();
   startSharpMonitor();
-  // 탭 이벤트 바인딩
-  document.getElementById('tapArea').onclick=onTapScan;
+  // 제스처 바인딩: 탭=스캔, 좌우스와이프=초점조절
+  bindGestures();
+}
+
+// ===== 제스처: 탭 → 스캔, 좌우 스와이프 → 초점 =====
+let touchStartX=0,touchStartY=0,touchMoved=false,touchStartTime=0;
+let curFocusPct=30; // 0~100
+
+function bindGestures(){
+  const el=document.getElementById('tapArea');
+  el.addEventListener('touchstart',onTS,{passive:false});
+  el.addEventListener('touchmove',onTM,{passive:false});
+  el.addEventListener('touchend',onTE,{passive:false});
+  // 마우스 fallback
+  el.addEventListener('mousedown',e=>{touchStartX=e.clientX;touchStartY=e.clientY;touchMoved=false;touchStartTime=Date.now()});
+  el.addEventListener('mouseup',e=>{if(!touchMoved&&Date.now()-touchStartTime<300)doTapScan(e)});
+}
+function onTS(e){
+  const t=e.touches[0];touchStartX=t.clientX;touchStartY=t.clientY;touchMoved=false;touchStartTime=Date.now();
+}
+function onTM(e){
+  e.preventDefault();
+  const t=e.touches[0],dx=t.clientX-touchStartX,dy=t.clientY-touchStartY;
+  if(Math.abs(dx)>10)touchMoved=true;
+  if(touchMoved&&Math.abs(dx)>Math.abs(dy)){
+    // 좌우 스와이프 → 초점 조절
+    const sens=0.15; // 민감도
+    curFocusPct=Math.max(0,Math.min(100,curFocusPct+dx*sens));
+    touchStartX=t.clientX;touchStartY=t.clientY;
+    applyFocusPct(curFocusPct);
+  }
+}
+function onTE(e){
+  if(!touchMoved&&Date.now()-touchStartTime<300){
+    // 짧은 탭 → 스캔
+    const t=e.changedTouches[0];
+    doTapScan({clientX:t.clientX,clientY:t.clientY,currentTarget:document.getElementById('tapArea')});
+  }
+}
+
+function applyFocusPct(pct){
+  if(!track)return;
+  const cap=track.getCapabilities?track.getCapabilities():{};
+  // 초점 인디케이터 표시
+  document.getElementById('fdBar').style.display='flex';
+  document.getElementById('fdFill').style.width=pct+'%';
+  document.getElementById('fdThumb').style.left=pct+'%';
+  document.getElementById('fdLabel').textContent=Math.round(pct)+'%';
+
+  if(cap.focusDistance){
+    const dist=mfMin+(mfMax-mfMin)*(pct/100);
+    try{track.applyConstraints({advanced:[{focusMode:'manual',focusDistance:dist}]})}catch(e){}
+  }else if(cap.zoom){
+    // focusDistance 미지원 시 줌으로 보완
+    const zMin=parseFloat(document.getElementById('zoomR').min);
+    const zMax=parseFloat(document.getElementById('zoomR').max);
+    const z=zMin+(zMax-zMin)*(pct/100);
+    try{track.applyConstraints({advanced:[{zoom:z}]})}catch(e){}
+    document.getElementById('zoomR').value=z;
+    document.getElementById('zoomV').textContent=z.toFixed(1)+'x';
+  }
 }
 
 // ===== 탭 → 1회 스캔 =====
-function onTapScan(e){
-  if(scanning)return; // 이미 스캔 중이면 무시
-  // 먼저 탭 초점 트리거
-  triggerFocus(e);
-  // 약간 딜레이 후 스캔 시작 (초점 잡힐 시간)
-  setTimeout(()=>startOneScan(),300);
-}
-
-async function triggerFocus(e){
-  if(!track)return;const cap=track.getCapabilities?track.getCapabilities():{};
-  const rect=e.currentTarget.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
+function doTapScan(e){
+  if(scanning)return;
+  // 초점 링
+  const rect=document.getElementById('tapArea').getBoundingClientRect();
+  const x=e.clientX-rect.left,y=e.clientY-rect.top;
   const ring=document.getElementById('focusRing');
-  ring.style.left=x+'px';ring.style.top=y+'px';ring.classList.add('show');setTimeout(()=>ring.classList.remove('show'),600);
-  if(cap.pointsOfInterest)try{await track.applyConstraints({advanced:[{pointsOfInterest:[{x:x/rect.width,y:y/rect.height}]}]})}catch(e){}
-  if(cap.focusMode&&cap.focusMode.includes('single-shot'))try{await track.applyConstraints({advanced:[{focusMode:'single-shot'}]})}catch(e){}
+  ring.style.left=x+'px';ring.style.top=y+'px';ring.classList.add('show');
+  setTimeout(()=>ring.classList.remove('show'),600);
+  // AF면 single-shot 트리거
+  if(afOn&&track){
+    const cap=track.getCapabilities?track.getCapabilities():{};
+    if(cap.pointsOfInterest)try{track.applyConstraints({advanced:[{pointsOfInterest:[{x:x/rect.width,y:y/rect.height}]}]})}catch(e){}
+    if(cap.focusMode&&cap.focusMode.includes('single-shot'))try{track.applyConstraints({advanced:[{focusMode:'single-shot'}]})}catch(e){}
+  }
+  setTimeout(()=>startOneScan(),300);
 }
 
 function startOneScan(){
@@ -334,7 +405,7 @@ function registerCode(){
 function backToPreview(){
   document.getElementById('resultOv').classList.remove('show');
   document.getElementById('scanStatus').textContent='미리보기';
-  document.getElementById('sHint').textContent='화면을 터치하면 1회 스캔합니다';
+  document.getElementById('sHint').textContent='좌우 스와이프 → 초점 조절 · 탭 → 1회 스캔';
 }
 function copyCode(){
   const v=document.getElementById('rVal').textContent;if(!v)return;
@@ -348,26 +419,31 @@ function fmtN(f){const m={'qr_code':'QR','ean_13':'EAN-13','ean_8':'EAN-8','code
 async function applyFocus(){
   if(!track)return;const cap=track.getCapabilities?track.getCapabilities():{};
   if(afOn){
-    document.getElementById('mfBar').classList.remove('show');
+    document.getElementById('fdBar').style.display='none';
     if(cap.focusMode){
       if(cap.focusMode.includes('continuous'))try{await track.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
       else if(cap.focusMode.includes('single-shot'))try{await track.applyConstraints({advanced:[{focusMode:'single-shot'}]})}catch(e){}
     }
   }else{
-    if(cap.focusMode&&cap.focusMode.includes('manual')&&cap.focusDistance){
+    if(cap.focusDistance){
       mfMin=cap.focusDistance.min;mfMax=cap.focusDistance.max;
-      const r=document.getElementById('mfRange');r.min=mfMin;r.max=mfMax;r.step=((mfMax-mfMin)/200).toFixed(4);
-      r.value=(mfMin+(mfMax-mfMin)*0.3).toFixed(4);
-      document.getElementById('mfBar').classList.add('show');setMfDist(r.value);
-    }else{showToast('수동초점 미지원');afOn=true;document.getElementById('btnAF').classList.add('on');document.getElementById('btnAF').textContent='AF';document.getElementById('mfBar').classList.remove('show')}
+      document.getElementById('fdBar').style.display='flex';
+      curFocusPct=30;applyFocusPct(30);
+      showToast('좌우로 스와이프하여 초점 조절');
+    }else{
+      document.getElementById('fdBar').style.display='none';
+      showToast('수동초점 미지원 — 줌으로 조절하세요');
+      afOn=true;document.getElementById('btnAF').classList.add('on');document.getElementById('btnAF').textContent='AF';
+    }
   }
 }
-async function setMfDist(v){if(!track)return;v=parseFloat(v);try{await track.applyConstraints({advanced:[{focusMode:'manual',focusDistance:v}]})}catch(e){}document.getElementById('mfVal').textContent=(mfMax>mfMin?((v-mfMin)/(mfMax-mfMin)*100).toFixed(0):0)+'%'}
+async function setMfDist(v){}
 async function toggleAF(){afOn=!afOn;document.getElementById('btnAF').classList.toggle('on',afOn);document.getElementById('btnAF').textContent=afOn?'AF':'MF';sharpMax=0;await applyFocus()}
 async function toggleTorch(){if(!track)return;const c=track.getCapabilities?track.getCapabilities():{};if(!c.torch){showToast('조명 미지원');return}torchOn=!torchOn;try{await track.applyConstraints({advanced:[{torch:torchOn}]})}catch(e){}document.getElementById('btnTorch').classList.toggle('on',torchOn)}
 async function setZoom(v){if(!track)return;try{await track.applyConstraints({advanced:[{zoom:parseFloat(v)}]})}catch(e){}document.getElementById('zoomV').textContent=parseFloat(v).toFixed(1)+'x'}
 
-// ===== 선명도 모니터 =====
+// ===== 선명도 모니터 + Focus Peaking =====
+let peakCv2,peakCtx2;
 function calcSharpness(){
   if(!edgeCv){edgeCv=document.createElement('canvas');edgeCtx=edgeCv.getContext('2d',{willReadFrequently:true})}
   const sw=160,sh=80;edgeCv.width=sw;edgeCv.height=sh;
@@ -384,6 +460,46 @@ function calcSharpness(){
   }
   return cnt>0?sum/cnt:0;
 }
+
+function drawFocusPeaking(){
+  // 비디오 중앙 영역에서 엣지를 추출하여 녹색으로 오버레이
+  const pc=document.getElementById('peakCv');
+  if(!pc)return;
+  if(!peakCv2){peakCv2=document.createElement('canvas');peakCtx2=peakCv2.getContext('2d',{willReadFrequently:true})}
+  const pw=240,ph=120;
+  peakCv2.width=pw;peakCv2.height=ph;
+  const vw=video.videoWidth,vh=video.videoHeight;
+  // 스캔박스 영역만 (중앙 65% x 30%)
+  const sw=Math.floor(vw*0.65),sh2=Math.floor(vh*0.3);
+  const sx=Math.floor((vw-sw)/2),sy=Math.floor((vh-sh2)/2);
+  peakCtx2.drawImage(video,sx,sy,sw,sh2,0,0,pw,ph);
+  const img=peakCtx2.getImageData(0,0,pw,ph),d=img.data;
+  // 엣지 검출 → 녹색 마킹
+  const out=peakCtx2.createImageData(pw,ph),od=out.data;
+  const threshold=25;
+  for(let y=1;y<ph-1;y++)for(let x=1;x<pw-1;x++){
+    const i=(y*pw+x)*4;
+    const c=d[i]*.299+d[i+1]*.587+d[i+2]*.114;
+    const t=d[((y-1)*pw+x)*4]*.299+d[((y-1)*pw+x)*4+1]*.587+d[((y-1)*pw+x)*4+2]*.114;
+    const b2=d[((y+1)*pw+x)*4]*.299+d[((y+1)*pw+x)*4+1]*.587+d[((y+1)*pw+x)*4+2]*.114;
+    const ll=d[(y*pw+x-1)*4]*.299+d[(y*pw+x-1)*4+1]*.587+d[(y*pw+x-1)*4+2]*.114;
+    const rr=d[(y*pw+x+1)*4]*.299+d[(y*pw+x+1)*4+1]*.587+d[(y*pw+x+1)*4+2]*.114;
+    const edge=Math.abs(t+b2+ll+rr-4*c);
+    if(edge>threshold){
+      od[i]=0;od[i+1]=230;od[i+2]=118;od[i+3]=Math.min(255,edge*3); // 녹색, 강도에 따라 투명도
+    }
+  }
+  // peakCv에 그리기
+  pc.width=pc.clientWidth||320;pc.height=pc.clientHeight||180;
+  const pctx=pc.getContext('2d');
+  pctx.clearRect(0,0,pc.width,pc.height);
+  // 임시 캔버스에 out 그리고 스케일
+  peakCtx2.putImageData(out,0,0);
+  // 스캔박스 위치에 맞춰 그리기
+  const dx=pc.width*0.175,dy=pc.height*0.35,dw=pc.width*0.65,dh=pc.height*0.3;
+  pctx.drawImage(peakCv2,0,0,pw,ph,dx,dy,dw,dh);
+}
+
 function startSharpMonitor(){
   if(sharpInterval)clearInterval(sharpInterval);
   sharpInterval=setInterval(()=>{
@@ -395,7 +511,9 @@ function startSharpMonitor(){
     if(n>.75){fill.style.background='#00e676';txt.style.color='#00e676';txt.textContent='SHARP';bdr.className='focus-border sharp'}
     else if(n>.4){fill.style.background='#ffc107';txt.style.color='#ffc107';txt.textContent='';bdr.className='focus-border mid'}
     else{fill.style.background='#ff5252';txt.style.color='#ff5252';txt.textContent='';bdr.className='focus-border'}
-  },200);
+    // Focus Peaking 그리기
+    drawFocusPeaking();
+  },250);
 }
 
 let tt;function showToast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),2000)}
