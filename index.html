@@ -151,7 +151,7 @@
   </div>
   <div class="s-hint" id="sHint">좌우 스와이프 → 초점 조절 · 탭 → 1회 스캔</div>
   <div class="s-hud-bot">
-    <button class="s-btn on" id="btnAF" onclick="toggleAF()">AF</button>
+    <button class="s-btn" id="btnAF" onclick="toggleAF()">MF</button>
     <button class="s-btn" id="btnTorch" onclick="toggleTorch()">🔦</button>
     <div class="s-zm">
       <label>줌</label>
@@ -181,7 +181,7 @@
 
 <script>
 let video,stream,track,cv,ctx;
-let scanning=false,afOn=true,torchOn=false;
+let scanning=false,afOn=false,torchOn=false;
 let hist=JSON.parse(localStorage.getItem('BC_HIST')||'[]');
 let lastCode='',lastTime=0,pendingCode=null;
 const DUP_DELAY=1500;
@@ -257,7 +257,7 @@ async function startCam(){
 
 // ===== 제스처: 탭 → 스캔, 좌우 스와이프 → 초점 =====
 let touchStartX=0,touchStartY=0,touchMoved=false,touchStartTime=0;
-let curFocusPct=30; // 0~100
+let curFocusPct=50; // 0~100 (S25 기준 0.5)
 
 function bindGestures(){
   const el=document.getElementById('tapArea');
@@ -426,7 +426,7 @@ async function applyFocus(){
     if(cap.focusDistance){
       mfMin=cap.focusDistance.min;mfMax=cap.focusDistance.max;
       document.getElementById('fdBar').style.display='flex';
-      curFocusPct=30;applyFocusPct(30);
+      curFocusPct=50;applyFocusPct(50);
       showToast('좌우로 스와이프하여 초점 조절');
     }else{
       document.getElementById('fdBar').style.display='none';
