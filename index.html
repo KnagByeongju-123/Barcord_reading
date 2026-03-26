@@ -91,11 +91,11 @@
   <div class="card">
     <div class="card-tit">📦 입고 등록</div>
     <div class="fg">
-      <label>대항목</label>
+      <label>분류</label>
       <select id="selCat" onchange="onCatChange()"><option value="">선택하세요</option></select>
     </div>
-    <div class="fg">
-      <label>소항목</label>
+    <div class="fg" id="fgSub" style="display:none">
+      <label id="lblSub">세부항목</label>
       <select id="selSub"><option value="">선택하세요</option></select>
     </div>
   </div>
@@ -140,7 +140,7 @@
     </div>
     <!-- 필터 -->
     <div style="display:flex;gap:6px;margin-bottom:10px">
-      <select id="filtCat" onchange="renderHist()" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:inherit"><option value="">전체 대항목</option></select>
+      <select id="filtCat" onchange="renderHist()" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:inherit"><option value="">전체 분류</option></select>
       <input type="date" id="filtDate" onchange="renderHist()" style="padding:6px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:inherit">
     </div>
     <div id="histList"><div class="h-empty">이력이 없습니다</div></div>
@@ -151,11 +151,11 @@
 <div class="pnl" id="pnl2">
   <div class="card">
     <div class="card-tit" style="justify-content:space-between">
-      <span>⚙ 대항목 / 소항목 관리</span>
+      <span>⚙ 분류 항목 관리</span>
       <button class="btn btn-sm btn-gray" onclick="resetCats()">기본값</button>
     </div>
     <div id="catEditor"></div>
-    <button class="add-btn" onclick="addCat()" style="margin-top:8px;padding:10px;font-size:13px">+ 대항목 추가</button>
+    <button class="add-btn" onclick="addCat()" style="margin-top:8px;padding:10px;font-size:13px">+ 분류 추가</button>
     <div style="margin-top:12px">
       <button class="btn btn-green" onclick="saveCats()">적용 저장</button>
     </div>
@@ -199,9 +199,15 @@ function renderSelects(){
   onCatChange();
 }
 function onCatChange(){
-  const ss=document.getElementById('selSub'),cat=cats.find(c=>c.name===document.getElementById('selCat').value);
+  const ss=document.getElementById('selSub'),fg=document.getElementById('fgSub'),lbl=document.getElementById('lblSub');
+  const catName=document.getElementById('selCat').value;
+  const cat=cats.find(c=>c.name===catName);
   ss.innerHTML='<option value="">선택하세요</option>';
-  if(cat)cat.subs.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;ss.appendChild(o)});
+  if(cat){
+    lbl.textContent=catName;
+    cat.subs.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;ss.appendChild(o)});
+    fg.style.display='block';
+  }else{fg.style.display='none'}
 }
 
 // ===== 사진/이미지 =====
@@ -272,8 +278,8 @@ function saveEntry(){
   const sub=document.getElementById('selSub').value;
   const qty=document.getElementById('inpQty').value;
   const note=document.getElementById('inpNote').value;
-  if(!cat){showToast('대항목을 선택하세요');return}
-  if(!sub){showToast('소항목을 선택하세요');return}
+  if(!cat){showToast('분류를 선택하세요');return}
+  if(!sub){showToast('세부항목을 선택하세요');return}
   if(!pendingScan){showToast('바코드를 스캔하세요');return}
 
   const now=new Date();
@@ -303,7 +309,7 @@ function saveEntry(){
 // ===== 이력 =====
 function renderHistFilter(){
   const fc=document.getElementById('filtCat');
-  fc.innerHTML='<option value="">전체 대항목</option>';
+  fc.innerHTML='<option value="">전체 분류</option>';
   cats.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;fc.appendChild(o)});
 }
 function renderHist(){
@@ -332,7 +338,7 @@ function cpVal(v){v=v.replace(/&#39;/g,"'");navigator.clipboard.writeText(v).the
 function expXlsx(){
   if(!hist.length){showToast('이력 없음');return}
   const wb=XLSX.utils.book_new();
-  const hd=['일자','시간','대항목','소항목','바코드','형식','수량','비고'];
+  const hd=['일자','시간','분류','세부항목','바코드','형식','수량','비고'];
   const rows=hist.map(h=>[h.date,h.time,h.cat,h.sub,h.barcode,h.format,h.qty,h.note]);
   const wd=[['입고 로트추적 이력'],[],hd,...rows];
   const ws=XLSX.utils.aoa_to_sheet(wd);
@@ -359,14 +365,14 @@ function renderCatEditor(){
       <input value="${cat.name}" oninput="cats[${ci}].name=this.value">
       <button class="s-del" onclick="delCat(${ci})">✕</button>
     </div>
-    <div class="cat-body">${subsHtml}<button class="add-btn" onclick="addSub(${ci})">+ 소항목 추가</button></div>`;
+    <div class="cat-body">${subsHtml}<button class="add-btn" onclick="addSub(${ci})">+ 항목 추가</button></div>`;
     c.appendChild(sec);
   });
 }
-function addCat(){cats.push({name:'새 항목',subs:['소항목1']});renderCatEditor()}
+function addCat(){cats.push({name:'새 분류',subs:['항목1']});renderCatEditor()}
 function delCat(i){if(cats.length<=1){showToast('최소 1개 필요');return}if(!confirm(cats[i].name+' 삭제?'))return;cats.splice(i,1);renderCatEditor()}
 function moveCat(i,d){const n=i+d;if(n<0||n>=cats.length)return;[cats[i],cats[n]]=[cats[n],cats[i]];renderCatEditor()}
-function addSub(ci){cats[ci].subs.push('새 소항목');renderCatEditor()}
+function addSub(ci){cats[ci].subs.push('새 항목');renderCatEditor()}
 function delSub(ci,si){if(cats[ci].subs.length<=1){showToast('최소 1개 필요');return}cats[ci].subs.splice(si,1);renderCatEditor()}
 function moveSub(ci,si,d){const n=si+d;if(n<0||n>=cats[ci].subs.length)return;[cats[ci].subs[si],cats[ci].subs[n]]=[cats[ci].subs[n],cats[ci].subs[si]];renderCatEditor()}
 function saveCats(){localStorage.setItem('LOT_CATS',JSON.stringify(cats));renderSelects();showToast('항목 저장 완료')}
