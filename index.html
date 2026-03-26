@@ -197,7 +197,7 @@ async function startScanner(){
       // 화면 거의 전체
       return{width:Math.floor(vw*0.95),height:Math.floor(vh*0.9)};
     },
-    videoConstraints:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}},
+    videoConstraints:{facingMode:'environment',width:{ideal:3840,min:1920},height:{ideal:2160,min:1080}},
     formatsToSupport:[
       Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.CODE_128,
       Html5QrcodeSupportedFormats.CODE_93,Html5QrcodeSupportedFormats.EAN_13,
@@ -229,7 +229,23 @@ async function startScanner(){
       }
     }catch(e){}
     try{await html5Qr.applyVideoConstraints({advanced:[{zoom:2},{focusMode:'continuous'}]})}catch(e){}
-    // 미리보기만
+
+    // 자동초점 한번 더 강제 (일부 기기 대응)
+    try{
+      const track=html5Qr.getRunningTrackSettings&&html5Qr.getRunningTrackCameraCapabilities?null:null;
+      const videoEl=document.querySelector('#reader video');
+      if(videoEl&&videoEl.srcObject){
+        const vTrack=videoEl.srcObject.getVideoTracks()[0];
+        if(vTrack){
+          const caps=vTrack.getCapabilities?vTrack.getCapabilities():{};
+          if(caps.focusMode&&caps.focusMode.includes('continuous')){
+            await vTrack.applyConstraints({advanced:[{focusMode:'continuous'}]});
+          }
+        }
+      }
+    }catch(e){}
+
+    // 미리보기만 (pause with video running)
     try{html5Qr.pause(true)}catch(e){}
     document.getElementById('tapArea').onclick=onTapScan;
   }catch(e){
@@ -238,7 +254,14 @@ async function startScanner(){
 }
 
 // ===== 스캔 =====
+let hasResult=false;
+
 function onTapScan(){
+  // 재스캔 상태면 먼저 미리보기로 복귀
+  if(hasResult){
+    resetToPreview();
+    return;
+  }
   if(scanActive)return;
   scanActive=true;
   pendingCode=null;
@@ -265,7 +288,7 @@ function onTapScan(){
 
 function onScanSuccess(text,result){
   if(!scanActive)return;
-  scanActive=false;
+  scanActive=false;hasResult=true;
   if(scanTimer){clearTimeout(scanTimer);scanTimer=null}
   try{html5Qr.pause(true)}catch(e){}
 
@@ -276,12 +299,21 @@ function onScanSuccess(text,result){
   const fmt=fmtName(result.result.format?result.result.format.formatName:'unknown');
   pendingCode={value:text,format:fmt,time:ts,ts:Date.now()};
 
-  document.getElementById('resText').textContent='✅ '+text;
+  document.getElementById('resText').textContent='✅ '+text+' ('+fmt+')';
   document.getElementById('resText').classList.add('found');
   document.getElementById('btnReg').disabled=false;
   document.getElementById('scanInd').classList.remove('show');
   document.getElementById('btnScan').classList.remove('scanning');
   document.getElementById('btnScan').innerHTML='🔄<br>재스캔';
+}
+
+function resetToPreview(){
+  hasResult=false;
+  pendingCode=null;
+  document.getElementById('btnReg').disabled=true;
+  document.getElementById('btnScan').innerHTML='📷<br>스캔';
+  document.getElementById('resText').textContent='화면을 터치하면 스캔';
+  document.getElementById('resText').classList.remove('found');
 }
 
 function registerCode(){
@@ -291,11 +323,8 @@ function registerCode(){
     localStorage.setItem('BC_HIST',JSON.stringify(hist));
     showToast('✅ '+pendingCode.value);
   }else{showToast('이미 등록됨')}
-  pendingCode=null;
-  document.getElementById('btnReg').disabled=true;
-  document.getElementById('btnScan').innerHTML='📷<br>스캔';
+  resetToPreview();
   document.getElementById('resText').textContent='등록 완료 · 터치하면 스캔';
-  document.getElementById('resText').classList.remove('found');
 }
 
 function fmtName(f){
