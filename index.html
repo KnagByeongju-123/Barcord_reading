@@ -42,8 +42,7 @@
     .focus-border{position:absolute;top:0;left:0;width:100%;height:100%;border:3px solid transparent;pointer-events:none;z-index:11;transition:border-color .3s}
     .focus-border.sharp{border-color:#00e676;box-shadow:inset 0 0 20px rgba(0,230,118,.15)}
     .focus-border.mid{border-color:#ffc107}
-    /* focus peaking 오버레이 */
-    #peakCv{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:11;opacity:.6}
+    /* focus peaking 제거됨 */
     /* 초점 위치 인디케이터 (하단 바) */
     .fd-bar{position:absolute;bottom:42px;left:50%;transform:translateX(-50%);width:50%;max-width:280px;height:28px;z-index:25;pointer-events:none;display:flex;align-items:center;gap:6px}
     .fd-track{flex:1;height:3px;background:rgba(255,255,255,.15);border-radius:2px;position:relative}
@@ -132,7 +131,6 @@
   <div class="s-tap" id="tapArea"></div>
   <div class="focus-ring" id="focusRing"></div>
   <div class="focus-border" id="focusBorder"></div>
-  <canvas id="peakCv"></canvas>
   <div class="fd-bar" id="fdBar" style="display:none">
     <span class="fd-icon">🌸</span>
     <div class="fd-track"><div class="fd-fill" id="fdFill" style="width:30%"></div><div class="fd-thumb" id="fdThumb" style="left:30%"></div></div>
@@ -442,8 +440,7 @@ async function toggleAF(){afOn=!afOn;document.getElementById('btnAF').classList.
 async function toggleTorch(){if(!track)return;const c=track.getCapabilities?track.getCapabilities():{};if(!c.torch){showToast('조명 미지원');return}torchOn=!torchOn;try{await track.applyConstraints({advanced:[{torch:torchOn}]})}catch(e){}document.getElementById('btnTorch').classList.toggle('on',torchOn)}
 async function setZoom(v){if(!track)return;try{await track.applyConstraints({advanced:[{zoom:parseFloat(v)}]})}catch(e){}document.getElementById('zoomV').textContent=parseFloat(v).toFixed(1)+'x'}
 
-// ===== 선명도 모니터 + Focus Peaking =====
-let peakCv2,peakCtx2;
+// ===== 선명도 모니터 =====
 function calcSharpness(){
   if(!edgeCv){edgeCv=document.createElement('canvas');edgeCtx=edgeCv.getContext('2d',{willReadFrequently:true})}
   const sw=160,sh=80;edgeCv.width=sw;edgeCv.height=sh;
@@ -461,45 +458,6 @@ function calcSharpness(){
   return cnt>0?sum/cnt:0;
 }
 
-function drawFocusPeaking(){
-  // 비디오 중앙 영역에서 엣지를 추출하여 녹색으로 오버레이
-  const pc=document.getElementById('peakCv');
-  if(!pc)return;
-  if(!peakCv2){peakCv2=document.createElement('canvas');peakCtx2=peakCv2.getContext('2d',{willReadFrequently:true})}
-  const pw=240,ph=120;
-  peakCv2.width=pw;peakCv2.height=ph;
-  const vw=video.videoWidth,vh=video.videoHeight;
-  // 스캔박스 영역만 (중앙 65% x 30%)
-  const sw=Math.floor(vw*0.65),sh2=Math.floor(vh*0.3);
-  const sx=Math.floor((vw-sw)/2),sy=Math.floor((vh-sh2)/2);
-  peakCtx2.drawImage(video,sx,sy,sw,sh2,0,0,pw,ph);
-  const img=peakCtx2.getImageData(0,0,pw,ph),d=img.data;
-  // 엣지 검출 → 녹색 마킹
-  const out=peakCtx2.createImageData(pw,ph),od=out.data;
-  const threshold=25;
-  for(let y=1;y<ph-1;y++)for(let x=1;x<pw-1;x++){
-    const i=(y*pw+x)*4;
-    const c=d[i]*.299+d[i+1]*.587+d[i+2]*.114;
-    const t=d[((y-1)*pw+x)*4]*.299+d[((y-1)*pw+x)*4+1]*.587+d[((y-1)*pw+x)*4+2]*.114;
-    const b2=d[((y+1)*pw+x)*4]*.299+d[((y+1)*pw+x)*4+1]*.587+d[((y+1)*pw+x)*4+2]*.114;
-    const ll=d[(y*pw+x-1)*4]*.299+d[(y*pw+x-1)*4+1]*.587+d[(y*pw+x-1)*4+2]*.114;
-    const rr=d[(y*pw+x+1)*4]*.299+d[(y*pw+x+1)*4+1]*.587+d[(y*pw+x+1)*4+2]*.114;
-    const edge=Math.abs(t+b2+ll+rr-4*c);
-    if(edge>threshold){
-      od[i]=0;od[i+1]=230;od[i+2]=118;od[i+3]=Math.min(255,edge*3); // 녹색, 강도에 따라 투명도
-    }
-  }
-  // peakCv에 그리기
-  pc.width=pc.clientWidth||320;pc.height=pc.clientHeight||180;
-  const pctx=pc.getContext('2d');
-  pctx.clearRect(0,0,pc.width,pc.height);
-  // 임시 캔버스에 out 그리고 스케일
-  peakCtx2.putImageData(out,0,0);
-  // 스캔박스 위치에 맞춰 그리기
-  const dx=pc.width*0.175,dy=pc.height*0.35,dw=pc.width*0.65,dh=pc.height*0.3;
-  pctx.drawImage(peakCv2,0,0,pw,ph,dx,dy,dw,dh);
-}
-
 function startSharpMonitor(){
   if(sharpInterval)clearInterval(sharpInterval);
   sharpInterval=setInterval(()=>{
@@ -511,8 +469,6 @@ function startSharpMonitor(){
     if(n>.75){fill.style.background='#00e676';txt.style.color='#00e676';txt.textContent='SHARP';bdr.className='focus-border sharp'}
     else if(n>.4){fill.style.background='#ffc107';txt.style.color='#ffc107';txt.textContent='';bdr.className='focus-border mid'}
     else{fill.style.background='#ff5252';txt.style.color='#ff5252';txt.textContent='';bdr.className='focus-border'}
-    // Focus Peaking 그리기
-    drawFocusPeaking();
   },250);
 }
 
