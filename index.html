@@ -94,7 +94,7 @@
   </div>
 
   <div class="card">
-    <div class="card-tit">📷 바코드 스캔</div>
+    <div class="card-tit">📷 바코드 스캔 (사진 방식)</div>
     <div class="btn-row">
       <button class="btn btn-green" onclick="takePhoto()">📷 사진촬영</button>
       <button class="btn btn-blue" onclick="loadImage()">🖼 이미지</button>
@@ -103,6 +103,23 @@
       <div class="sr-val" id="srVal"></div>
       <div class="sr-fmt" id="srFmt"></div>
       <img class="sr-img" id="srImg" style="display:none">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-tit">📱 QR코드 스캔 (실시간 카메라)</div>
+    <div id="qrPreview" style="display:none">
+      <div id="qrReader" style="width:100%;border-radius:8px;overflow:hidden"></div>
+      <div style="margin-top:8px;text-align:center">
+        <button class="btn btn-sm btn-gray" onclick="stopQr()">카메라 닫기</button>
+      </div>
+    </div>
+    <div id="qrBtnWrap">
+      <button class="btn btn-green" onclick="startQr()" style="background:linear-gradient(135deg,#7b1fa2,#ab47bc);box-shadow:0 2px 8px rgba(123,31,162,.2)">📱 QR 스캔 시작</button>
+    </div>
+    <div class="scan-result" id="qrResult">
+      <div class="sr-val" id="qrVal"></div>
+      <div class="sr-fmt" id="qrFmt"></div>
     </div>
   </div>
 
@@ -176,6 +193,7 @@ let pendingScan=null; // {value,format}
 function swTab(n){
   document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('on',i===n)});
   document.querySelectorAll('.pnl').forEach((p,i)=>{p.classList.toggle('on',i===n)});
+  if(n!==0)stopQr(); // 다른 탭 이동 시 QR 카메라 정리
   if(n===0){renderRegFields()}
   if(n===1){renderHistFilter();renderHist()}
   if(n===2){renderCatEditor()}
@@ -254,11 +272,73 @@ function scanFail(){
 }
 function fmtN(f){if(!f)return'?';const s=f.toString().toUpperCase();return{'QR_CODE':'QR','CODE_39':'Code39','CODE_128':'Code128','CODE_93':'Code93','EAN_13':'EAN-13','EAN_8':'EAN-8','UPC_A':'UPC-A','UPC_E':'UPC-E','ITF':'ITF','CODABAR':'Codabar','DATA_MATRIX':'DataMatrix','PDF_417':'PDF417'}[s]||s}
 
+// ===== QR코드 실시간 스캔 =====
+let qrScanner=null;
+
+async function startQr(){
+  document.getElementById('qrBtnWrap').style.display='none';
+  document.getElementById('qrPreview').style.display='block';
+  document.getElementById('qrResult').classList.remove('show');
+
+  qrScanner=new Html5Qrcode('qrReader');
+  try{
+    await qrScanner.start(
+      {facingMode:'environment'},
+      {fps:15,qrbox:{width:250,height:250},
+        formatsToSupport:[
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.DATA_MATRIX,
+          Html5QrcodeSupportedFormats.PDF_417,
+          Html5QrcodeSupportedFormats.AZTEC,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+        ],
+        experimentalFeatures:{useBarCodeDetectorIfSupported:true}
+      },
+      onQrSuccess,
+      ()=>{}
+    );
+  }catch(e){
+    showToast('카메라 오류: '+e);
+    stopQr();
+  }
+}
+
+function onQrSuccess(text,result){
+  const fmt=result.result&&result.result.format?result.result.format.formatName:'QR_CODE';
+  pendingScan={value:text,format:fmtN(fmt)};
+
+  // 결과 표시
+  const sr=document.getElementById('qrResult');
+  sr.classList.add('show');sr.classList.remove('fail');
+  document.getElementById('qrVal').textContent=text;
+  document.getElementById('qrFmt').textContent='형식: '+fmtN(fmt);
+
+  if(navigator.vibrate)navigator.vibrate([50,30,50]);
+  showToast('✅ '+text);
+
+  // 스캔 멈춤
+  stopQr();
+}
+
+async function stopQr(){
+  if(qrScanner){
+    try{await qrScanner.stop()}catch(e){}
+    try{qrScanner.clear()}catch(e){}
+    qrScanner=null;
+  }
+  document.getElementById('qrPreview').style.display='none';
+  document.getElementById('qrBtnWrap').style.display='block';
+}
+
 // ===== 저장 =====
 function saveEntry(){
   const qty=document.getElementById('inpQty').value;
   const note=document.getElementById('inpNote').value;
-  if(!pendingScan){showToast('바코드를 스캔하세요');return}
+  if(!pendingScan){showToast('바코드 또는 QR코드를 스캔하세요');return}
 
   // 각 대항목별 선택값 수집
   const fields={};
