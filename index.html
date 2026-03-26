@@ -36,6 +36,10 @@
     .hud-btn{padding:6px 14px;border:1.5px solid rgba(255,255,255,.3);border-radius:8px;background:rgba(0,0,0,.3);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;backdrop-filter:blur(4px)}
     .hud-btn:active{background:rgba(255,255,255,.15)}
     .hud-btn.on{border-color:#00d4ff;color:#00d4ff}
+    .scan-trigger{width:56px;height:56px;border-radius:50%;border:3px solid #fff;background:rgba(0,212,255,.2);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(0,212,255,.3);transition:all .15s}
+    .scan-trigger:active{transform:scale(.9);background:rgba(0,212,255,.5)}
+    .scan-trigger.scanning{border-color:#00e676;background:rgba(0,230,118,.3);animation:pulse-scan .8s infinite}
+    @keyframes pulse-scan{0%,100%{box-shadow:0 0 16px rgba(0,230,118,.3)}50%{box-shadow:0 0 30px rgba(0,230,118,.6)}}
     .zm{display:flex;align-items:center;gap:4px}
     .zm label{font-size:10px;color:rgba(255,255,255,.6)}
     .zm input[type=range]{width:60px;accent-color:#00d4ff}
@@ -138,17 +142,18 @@
     <span class="cnt" id="scanCnt">이력: 0건</span>
   </div>
 
-  <div class="hint" id="hintTxt">바코드를 사각형 안에 위치시키세요 · 탭하면 초점</div>
+  <div class="hint" id="hintTxt">초점을 맞춘 후 스캔 버튼을 누르세요</div>
 
   <div class="hud-bot">
     <button class="hud-btn on" id="btnAF" onclick="toggleAF()">AF</button>
     <button class="hud-btn" id="btnTorch" onclick="toggleTorch()">🔦</button>
+    <button class="scan-trigger" id="btnScan" onclick="startScan()">스캔</button>
     <div class="zm">
       <label>줌</label>
       <input type="range" id="zoomR" min="1" max="5" step="0.1" value="2" oninput="setZoom(this.value)">
       <span id="zoomV">2.0x</span>
     </div>
-    <button class="hud-btn" onclick="toggleHist()">📋 이력</button>
+    <button class="hud-btn" onclick="toggleHist()">📋</button>
   </div>
 
   <!-- 결과 오버레이 -->
@@ -236,8 +241,9 @@ async function startCam(){
     try{await track.applyConstraints({advanced:[{zoom:iz}]})}catch(e){}
   }
   await applyFocus();
-  scanning=true;scanLoop();
   startSharpMonitor();
+  // 미리보기만 — 스캔 버튼 눌러야 스캔 시작
+  document.getElementById('scanOv').style.opacity='0.4';
 }
 
 let mfMin=0,mfMax=1,sharpMax=0;
@@ -364,7 +370,38 @@ async function onTapFocus(e){
   }
 }
 
+let scanTimeout=null;
+
+function startScan(){
+  if(scanning)return;
+  const btn=document.getElementById('btnScan');
+  btn.classList.add('scanning');btn.textContent='...';
+  document.getElementById('scanOv').style.opacity='1';
+  document.getElementById('hintTxt').textContent='스캔 중...';
+  scanning=true;
+  scanLoop();
+  // 5초 타임아웃
+  scanTimeout=setTimeout(()=>{
+    if(scanning){
+      scanning=false;
+      btn.classList.remove('scanning');btn.textContent='스캔';
+      document.getElementById('scanOv').style.opacity='0.4';
+      document.getElementById('hintTxt').textContent='인식 실패 — 초점/위치 조정 후 다시 시도';
+      showToast('바코드를 인식하지 못했습니다');
+    }
+  },5000);
+}
+
+function stopScan(){
+  scanning=false;
+  if(scanTimeout){clearTimeout(scanTimeout);scanTimeout=null}
+  const btn=document.getElementById('btnScan');
+  btn.classList.remove('scanning');btn.textContent='스캔';
+  document.getElementById('scanOv').style.opacity='0.4';
+}
+
 function scanLoop(){if(!scanning)return;decode().then(()=>{if(scanning)requestAnimationFrame(scanLoop)})}
+
 
 async function decode(){
   if(!video.videoWidth||video.paused)return;
@@ -398,9 +435,10 @@ function onDecoded(val,fmt){
   pendingCode={value:val,format:fn,time:ts,ts:now};
 
   // 스캔 멈추고 결과 표시
-  scanning=false;
+  stopScan();
   document.getElementById('scanOv').style.display='none';
   document.getElementById('resultOv').classList.add('show');
+  document.getElementById('hintTxt').textContent='';
 }
 
 function registerCode(){
@@ -416,7 +454,8 @@ function registerCode(){
 function retryScan(){
   document.getElementById('resultOv').classList.remove('show');
   document.getElementById('scanOv').style.display='';
-  scanning=true;scanLoop();
+  document.getElementById('scanOv').style.opacity='0.4';
+  document.getElementById('hintTxt').textContent='초점을 맞춘 후 스캔 버튼을 누르세요';
 }
 
 function copyCode(){
