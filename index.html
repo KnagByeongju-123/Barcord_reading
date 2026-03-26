@@ -173,11 +173,11 @@ async function startScanner(){
   document.getElementById('scanStatus').textContent='카메라 준비중...';
 
   const config={
-    fps:10,
+    fps:15,
     qrbox:function(vw,vh){
-      // 가로 직사각형 스캔 영역
-      const w=Math.floor(Math.min(vw,vh)*0.85);
-      const h=Math.floor(w*0.25);
+      // 화면 거의 전체를 스캔 영역으로 (여백만 살짝)
+      const w=Math.floor(vw*0.95);
+      const h=Math.floor(vh*0.7);
       return{width:w,height:h};
     },
     aspectRatio:1.0,
