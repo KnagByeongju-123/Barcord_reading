@@ -35,8 +35,11 @@
     .scan-scr{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;z-index:1000}
     .scan-scr.active{display:flex;flex-direction:row}
 
-    /* 카메라 영역 (왼쪽, 나머지 전체) */
-    .s-cam{flex:1;position:relative;overflow:hidden;background:#000}
+    /* 왼쪽: 카메라(상단) + 결과(하단) */
+    .s-left{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+    /* 카메라 영역 (상단, 높이 70%) */
+    .s-cam{flex:0 0 70%;position:relative;overflow:hidden;background:#000}
     #reader{width:100%;height:100%}
     #reader video{width:100%!important;height:100%!important;object-fit:cover!important}
     #reader__scan_region{width:100%!important;height:100%!important}
@@ -46,13 +49,19 @@
     #reader__header_message{display:none!important}
     #reader>div:last-child{display:none!important}
     .s-tap{position:absolute;top:0;left:0;width:100%;height:100%;z-index:12;cursor:pointer}
-    .s-result-bar{position:absolute;top:0;left:0;right:0;padding:6px 12px;background:rgba(0,0,0,.6);z-index:15;font-size:13px;color:#aaa;text-align:center;pointer-events:none}
-    .s-result-bar.found{color:#00e676;font-weight:700}
     .s-status{position:absolute;bottom:6px;left:0;width:100%;text-align:center;font-size:11px;color:rgba(255,255,255,.6);z-index:15;pointer-events:none}
     .s-scanning{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:16;pointer-events:none;display:none}
     .s-scanning.show{display:block}
     .s-scanning span{background:rgba(0,230,118,.85);color:#000;padding:6px 18px;border-radius:20px;font-size:14px;font-weight:700;animation:pulse .6s infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    /* 하단 결과/이력 바 */
+    .s-bottom{flex:1;background:#111;display:flex;flex-direction:column;overflow:hidden;padding:6px 10px}
+    .sb-result{font-size:13px;color:#888;padding:4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .sb-result.found{color:#00e676;font-weight:700}
+    .sb-hist{flex:1;overflow-y:auto}
+    .sbh-item{font-size:11px;color:#aaa;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.05);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .sbh-item:last-child{border:none}
+    .sbh-item .sbh-n{color:#00d4ff;font-weight:700;margin-right:4px}
 
     /* 우측 패널 (버튼 + 줌) */
     .s-panel{width:72px;background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:10px 4px;flex-shrink:0;z-index:10}
@@ -94,13 +103,20 @@
 
 <!-- 스캔 (가로) -->
 <div class="scan-scr" id="scanScreen">
-  <!-- 카메라 -->
-  <div class="s-cam">
-    <div id="reader"></div>
-    <div class="s-tap" id="tapArea"></div>
-    <div class="s-result-bar" id="resBar">화면을 터치하면 스캔</div>
-    <div class="s-status" id="sStatus"></div>
-    <div class="s-scanning" id="scanInd"><span>스캔 중...</span></div>
+  <!-- 왼쪽: 카메라 + 하단 결과 -->
+  <div class="s-left">
+    <!-- 카메라 (상단) -->
+    <div class="s-cam">
+      <div id="reader"></div>
+      <div class="s-tap" id="tapArea"></div>
+      <div class="s-status" id="sStatus"></div>
+      <div class="s-scanning" id="scanInd"><span>스캔 중...</span></div>
+    </div>
+    <!-- 하단 결과/이력 -->
+    <div class="s-bottom">
+      <div class="sb-result" id="resBar">화면을 터치하면 스캔</div>
+      <div class="sb-hist" id="scanHistList"></div>
+    </div>
   </div>
   <!-- 우측 패널 -->
   <div class="s-panel">
@@ -156,6 +172,7 @@ async function openScan(){
   document.getElementById('resBar').textContent='화면을 터치하면 스캔';
   document.getElementById('resBar').classList.remove('found');
   await startScanner();
+  renderScanHist();
 }
 
 async function closeScan(){
@@ -174,8 +191,8 @@ async function startScanner(){
   const config={
     fps:30,
     qrbox:function(vw,vh){
-      const w=Math.floor(vw*0.85);
-      const h=Math.floor(vh*0.5);
+      const w=Math.floor(vw*0.92);
+      const h=Math.floor(vh*0.8);
       return{width:w,height:h};
     },
     videoConstraints:{
@@ -287,9 +304,21 @@ function registerCode(){
   if(!hist.find(h=>h.value===pendingCode.value&&h.ts===pendingCode.ts)){
     hist.unshift({...pendingCode});if(hist.length>200)hist.length=200;
     localStorage.setItem('BC_HIST',JSON.stringify(hist));
+    renderScanHist();
     showToast('✅ 등록: '+pendingCode.value);
   }else{showToast('이미 등록됨')}
   resetScanUI();
+}
+
+function renderScanHist(){
+  const c=document.getElementById('scanHistList');
+  if(!hist.length){c.innerHTML='';return}
+  c.innerHTML='';
+  hist.slice(0,10).forEach((h,i)=>{
+    const d=document.createElement('div');d.className='sbh-item';
+    d.innerHTML=`<span class="sbh-n">${i+1}</span>${h.value} · ${h.format}`;
+    c.appendChild(d);
+  });
 }
 
 function resetScanUI(){
