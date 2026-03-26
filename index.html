@@ -163,10 +163,9 @@
 <script>
 // ===== 기본 데이터 =====
 const DEFAULT_CATS=[
-  {name:'소재',subs:['코일','환봉','파이프','판재','기타']},
-  {name:'부품',subs:['볼트','너트','베어링','씰','기타']},
-  {name:'포장재',subs:['박스','파레트','비닐','기타']},
-  {name:'소모품',subs:['오일','그리스','공구','기타']}
+  {name:'공급사',subs:['태경스틸','동일스텐','정민스틸','나스테크']},
+  {name:'소재',subs:['SPCC','SUS430','SUS304','S70C','S55C']},
+  {name:'규격',subs:['60','70','80']}
 ];
 
 let cats=JSON.parse(localStorage.getItem('LOT_CATS')||'null')||JSON.parse(JSON.stringify(DEFAULT_CATS));
