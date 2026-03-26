@@ -200,12 +200,20 @@ function swTab(n){
 }
 
 // ===== 등록 탭: 항목 셀렉트 =====
+let savedSelections={}; // 선택값 보존용
+
 function renderRegFields(){
+  // 기존 선택값 저장
+  cats.forEach((cat,i)=>{
+    const el=document.getElementById('sel_'+i);
+    if(el&&el.value)savedSelections[cat.name]=el.value;
+  });
   const c=document.getElementById('regFields');
   c.innerHTML='';
   cats.forEach((cat,i)=>{
+    const prev=savedSelections[cat.name]||'';
     const div=document.createElement('div');div.className='fg';
-    div.innerHTML=`<label>${cat.name}</label><select id="sel_${i}"><option value="">선택하세요</option>${cat.subs.map(s=>'<option value="'+s+'">'+s+'</option>').join('')}</select>`;
+    div.innerHTML=`<label>${cat.name}</label><select id="sel_${i}"><option value="">선택하세요</option>${cat.subs.map(s=>'<option value="'+s+'"'+(s===prev?' selected':'')+'>'+s+'</option>').join('')}</select>`;
     c.appendChild(div);
   });
 }
