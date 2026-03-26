@@ -7,411 +7,297 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Noto Sans KR',sans-serif;background:#000;color:#fff;overflow:hidden;height:100vh;width:100vw}
+    body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f5;color:#212121;overflow-x:hidden}
 
-    /* 전체 래퍼 - 항상 가로 */
-    .app{width:100vw;height:100vh;position:relative;overflow:hidden}
+    /* ===== 메인 화면 (세로) ===== */
+    .main{min-height:100vh;padding:0 0 80px}
+    .main-hdr{background:linear-gradient(135deg,#1a237e,#283593);color:#fff;padding:16px;text-align:center}
+    .main-hdr h1{font-size:20px;font-weight:700}
+    .main-hdr p{font-size:12px;opacity:.7;margin-top:4px}
+    .scan-start-btn{display:block;margin:20px auto;padding:16px 40px;background:linear-gradient(135deg,#00c853,#00e676);color:#000;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(0,200,83,.3)}
+    .scan-start-btn:active{transform:scale(.97)}
+    /* 이력 */
+    .m-section{margin:12px;background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    .m-title{font-size:15px;font-weight:700;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+    .m-title button{padding:4px 10px;border:1px solid #ffcdd2;border-radius:6px;background:none;color:#c62828;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
+    .m-empty{text-align:center;padding:20px;color:#aaa;font-size:13px}
+    .m-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5}
+    .m-item:last-child{border:none}
+    .m-num{width:26px;height:26px;border-radius:6px;background:#e3f2fd;color:#1565c0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+    .m-body{flex:1;min-width:0}
+    .m-val{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .m-meta{font-size:10px;color:#999;margin-top:1px}
+    .m-cp{width:28px;height:28px;border:none;border-radius:6px;background:#f5f5f5;color:#888;font-size:13px;cursor:pointer;flex-shrink:0}
+    .m-exp{display:flex;gap:8px;margin:12px}
+    .m-exp button{flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+    .me-csv{background:#1b5e20;color:#fff}.me-txt{background:#f5f5f5;color:#555;border:1px solid #ddd}
 
-    /* 비디오 풀 */
+    /* ===== 스캔 화면 (가로 풀스크린) ===== */
+    .scan-screen{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;z-index:1000}
+    .scan-screen.active{display:block}
     #video{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
-
-    /* 스캔 오버레이 */
-    .ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
-    .scan-box{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:65%;height:30%;border:2px solid #00d4ff;border-radius:10px}
-    .scan-box::before{content:'';position:absolute;top:-1px;left:8%;right:8%;height:2px;background:#00d4ff;box-shadow:0 0 12px #00d4ff;animation:sl 2s ease-in-out infinite}
+    .s-tap{position:absolute;top:0;left:0;width:100%;height:100%;z-index:12;cursor:pointer}
+    .focus-ring{position:absolute;width:50px;height:50px;border:2px solid #00d4ff;border-radius:50%;transform:translate(-50%,-50%) scale(1.5);opacity:0;transition:transform .3s,opacity .3s;pointer-events:none;z-index:13}
+    .focus-ring.show{transform:translate(-50%,-50%) scale(1);opacity:1}
+    .focus-border{position:absolute;top:0;left:0;width:100%;height:100%;border:3px solid transparent;pointer-events:none;z-index:11;transition:border-color .3s}
+    .focus-border.sharp{border-color:#00e676;box-shadow:inset 0 0 20px rgba(0,230,118,.15)}
+    .focus-border.mid{border-color:#ffc107}
+    .s-ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+    .s-box{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:65%;height:30%;border:2px solid #00d4ff;border-radius:10px;opacity:.4;transition:opacity .2s}
+    .s-box.active{opacity:1}
+    .s-box::before{content:'';position:absolute;top:-1px;left:8%;right:8%;height:2px;background:#00d4ff;box-shadow:0 0 12px #00d4ff;animation:sl 2s ease-in-out infinite;display:none}
+    .s-box.active::before{display:block}
     @keyframes sl{0%,100%{top:-1px}50%{top:calc(100% - 1px)}}
     .sc-c{position:absolute;width:16px;height:16px;border-color:#00d4ff;border-style:solid}
     .sc-tl{top:-2px;left:-2px;border-width:3px 0 0 3px;border-radius:5px 0 0 0}
     .sc-tr{top:-2px;right:-2px;border-width:3px 3px 0 0;border-radius:0 5px 0 0}
     .sc-bl{bottom:-2px;left:-2px;border-width:0 0 3px 3px;border-radius:0 0 0 5px}
     .sc-br{bottom:-2px;right:-2px;border-width:0 3px 3px 0;border-radius:0 0 5px 0}
-
     /* 상단 HUD */
-    .hud-top{position:absolute;top:0;left:0;right:0;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(to bottom,rgba(0,0,0,.6),transparent);z-index:20;pointer-events:auto}
-    .hud-top h1{font-size:14px;font-weight:700;color:#00d4ff}
-    .hud-top .cnt{font-size:11px;color:rgba(255,255,255,.7)}
-
+    .s-hud-top{position:absolute;top:0;left:0;right:0;padding:6px 14px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(to bottom,rgba(0,0,0,.5),transparent);z-index:20}
+    .s-hud-top span{font-size:12px;color:rgba(255,255,255,.8)}
+    .s-back{padding:6px 12px;border:none;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
     /* 하단 HUD */
-    .hud-bot{position:absolute;bottom:0;left:0;right:0;padding:8px 16px;display:flex;justify-content:center;align-items:center;gap:10px;background:linear-gradient(to top,rgba(0,0,0,.6),transparent);z-index:20;pointer-events:auto}
-    .hud-btn{padding:6px 14px;border:1.5px solid rgba(255,255,255,.3);border-radius:8px;background:rgba(0,0,0,.3);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;backdrop-filter:blur(4px)}
-    .hud-btn:active{background:rgba(255,255,255,.15)}
-    .hud-btn.on{border-color:#00d4ff;color:#00d4ff}
-    .scan-trigger{width:56px;height:56px;border-radius:50%;border:3px solid #fff;background:rgba(0,212,255,.2);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(0,212,255,.3);transition:all .15s}
-    .scan-trigger:active{transform:scale(.9);background:rgba(0,212,255,.5)}
-    .scan-trigger.scanning{border-color:#00e676;background:rgba(0,230,118,.3);animation:pulse-scan .8s infinite}
-    @keyframes pulse-scan{0%,100%{box-shadow:0 0 16px rgba(0,230,118,.3)}50%{box-shadow:0 0 30px rgba(0,230,118,.6)}}
-    .zm{display:flex;align-items:center;gap:4px}
-    .zm label{font-size:10px;color:rgba(255,255,255,.6)}
-    .zm input[type=range]{width:60px;accent-color:#00d4ff}
-    .zm span{font-size:10px;color:rgba(255,255,255,.6);min-width:24px}
-
-    /* 안내 텍스트 */
-    .hint{position:absolute;bottom:60px;left:0;width:100%;text-align:center;font-size:12px;color:rgba(255,255,255,.6);z-index:15;pointer-events:none}
-
-    /* 탭 초점 */
-    .tap-area{position:absolute;top:0;left:0;width:100%;height:100%;z-index:12;cursor:pointer}
-    .focus-ring{position:absolute;width:50px;height:50px;border:2px solid #00d4ff;border-radius:50%;transform:translate(-50%,-50%) scale(1.5);opacity:0;transition:transform .3s,opacity .3s;pointer-events:none;z-index:13}
-    .focus-ring.show{transform:translate(-50%,-50%) scale(1);opacity:1}
-
-    /* ===== 결과 오버레이 ===== */
-    .result-ov{display:none;position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.75);z-index:50;align-items:center;justify-content:center;flex-direction:column;backdrop-filter:blur(6px)}
-    .result-ov.show{display:flex}
-    .r-card{background:rgba(30,30,60,.95);border-radius:16px;padding:24px 32px;max-width:420px;width:85%;text-align:center;border:1px solid rgba(0,212,255,.2);box-shadow:0 8px 32px rgba(0,0,0,.5)}
-    .r-val{font-size:22px;font-weight:700;color:#00e676;word-break:break-all;line-height:1.3;margin:12px 0 6px}
-    .r-fmt{font-size:11px;color:#00d4ff}
-    .r-tm{font-size:10px;color:rgba(255,255,255,.5);margin-top:2px}
-    .r-btns{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;justify-content:center}
-    .r-btns button{padding:10px 20px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-width:90px}
-    .rb-reg{background:#00e676;color:#000}
-    .rb-reg:active{background:#00c853}
-    .rb-retry{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.3)}
-    .rb-copy{background:rgba(0,212,255,.15);color:#00d4ff;border:1.5px solid rgba(0,212,255,.3)}
-    .rb-close{background:rgba(255,82,82,.15);color:#ff5252;border:1.5px solid rgba(255,82,82,.3)}
-
-    /* 이력 패널 (슬라이드) */
-    .hist-panel{position:absolute;top:0;right:-320px;width:300px;height:100%;background:rgba(20,20,40,.95);z-index:60;transition:right .3s;overflow-y:auto;padding:14px;backdrop-filter:blur(8px);border-left:1px solid rgba(255,255,255,.1)}
-    .hist-panel.open{right:0}
-    .hp-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-    .hp-top h3{font-size:14px;font-weight:700;color:#00d4ff}
-    .hp-close{width:30px;height:30px;border:none;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-    .hp-acts{display:flex;gap:4px;margin-bottom:10px}
-    .hp-acts button{flex:1;padding:6px;border:none;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit}
-    .hpa-csv{background:rgba(0,230,118,.15);color:#00e676}
-    .hpa-txt{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
-    .hpa-del{background:rgba(255,82,82,.12);color:#ff5252}
-    .h-empty{text-align:center;padding:20px;color:rgba(255,255,255,.4);font-size:12px}
-    .h-item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)}
-    .h-item:last-child{border:none}
-    .h-num{width:20px;height:20px;border-radius:5px;background:rgba(0,212,255,.15);color:#00d4ff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
-    .h-body{flex:1;min-width:0}
-    .h-val{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .h-meta{font-size:9px;color:rgba(255,255,255,.4);margin-top:1px}
-    .h-cp{width:24px;height:24px;border:none;border-radius:5px;background:rgba(255,255,255,.05);color:rgba(255,255,255,.5);font-size:11px;cursor:pointer;flex-shrink:0}
-
-    /* 플래시 */
-    .flash{position:absolute;top:0;left:0;width:100%;height:100%;background:#00e676;opacity:0;pointer-events:none;z-index:99;transition:opacity .1s}
-    .flash.on{opacity:.2}
-    /* 토스트 */
-    .toast{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;padding:8px 18px;border-radius:18px;font-size:12px;font-weight:600;z-index:100;opacity:0;transition:opacity .3s;pointer-events:none}
-    .toast.show{opacity:1}
-
-    /* 수동초점 슬라이더 */
-    .mf-bar{display:none;position:absolute;bottom:52px;left:50%;transform:translateX(-50%);width:70%;max-width:350px;z-index:25;pointer-events:auto;background:rgba(0,0,0,.5);border-radius:10px;padding:6px 14px;backdrop-filter:blur(4px)}
+    .s-hud-bot{position:absolute;bottom:0;left:0;right:0;padding:6px 14px;display:flex;justify-content:center;align-items:center;gap:10px;background:linear-gradient(to top,rgba(0,0,0,.5),transparent);z-index:20}
+    .s-btn{padding:5px 12px;border:1.5px solid rgba(255,255,255,.3);border-radius:7px;background:rgba(0,0,0,.3);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
+    .s-btn.on{border-color:#00d4ff;color:#00d4ff}
+    .s-zm{display:flex;align-items:center;gap:4px}
+    .s-zm label{font-size:10px;color:rgba(255,255,255,.5)}
+    .s-zm input{width:60px;accent-color:#00d4ff}
+    .s-zm span{font-size:10px;color:rgba(255,255,255,.5);min-width:24px}
+    /* 힌트 */
+    .s-hint{position:absolute;bottom:50px;left:0;width:100%;text-align:center;font-size:13px;color:rgba(255,255,255,.7);z-index:15;pointer-events:none;text-shadow:0 1px 4px rgba(0,0,0,.8)}
+    /* 선명도 미터 */
+    .sharp-m{position:absolute;top:50%;right:10px;transform:translateY(-50%);width:5px;height:80px;background:rgba(255,255,255,.1);border-radius:3px;z-index:20;overflow:hidden;pointer-events:none}
+    .sharp-f{position:absolute;bottom:0;width:100%;border-radius:3px;transition:height .2s,background .2s}
+    .sharp-t{position:absolute;top:50%;right:22px;transform:translateY(-50%);font-size:9px;font-weight:700;z-index:20;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+    /* MF 바 */
+    .mf-bar{display:none;position:absolute;bottom:42px;left:50%;transform:translateX(-50%);width:65%;max-width:320px;z-index:25;background:rgba(0,0,0,.5);border-radius:8px;padding:5px 12px;backdrop-filter:blur(4px)}
     .mf-bar.show{display:block}
-    .mf-label{display:flex;justify-content:space-between;align-items:center;font-size:10px;margin-bottom:4px}
-    .mf-label span{color:rgba(255,255,255,.6)}
-    .mf-label .mf-val{color:#00d4ff;font-weight:600}
-    .mf-range{width:100%;accent-color:#00d4ff;height:20px}
-    .mf-icons{display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,.4);margin-top:2px}
-
-    /* 초점 품질 테두리 */
-    .focus-border{position:absolute;top:0;left:0;width:100%;height:100%;border:3px solid transparent;pointer-events:none;z-index:11;transition:border-color .3s;border-radius:0}
-    .focus-border.sharp{border-color:#00e676;box-shadow:inset 0 0 20px rgba(0,230,118,.15)}
-    .focus-border.mid{border-color:#ffc107;box-shadow:inset 0 0 10px rgba(255,193,7,.1)}
-    .focus-border.blur{border-color:transparent}
-
-    /* 선명도 인디케이터 */
-    .sharp-meter{position:absolute;top:50%;right:12px;transform:translateY(-50%);width:6px;height:100px;background:rgba(255,255,255,.1);border-radius:3px;z-index:20;overflow:hidden;pointer-events:none}
-    .sharp-fill{position:absolute;bottom:0;width:100%;border-radius:3px;transition:height .2s,background .2s}
-    .sharp-text{position:absolute;top:50%;right:24px;transform:translateY(-50%);font-size:9px;font-weight:700;z-index:20;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+    .mf-top{display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,.5);margin-bottom:2px}
+    .mf-top .mf-v{color:#00d4ff;font-weight:600}
+    .mf-bar input{width:100%;accent-color:#00d4ff}
+    .mf-ft{display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,.3);margin-top:1px}
+    /* 결과 오버레이 */
+    .r-ov{display:none;position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:50;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+    .r-ov.show{display:flex}
+    .r-card{background:rgba(30,30,60,.95);border-radius:14px;padding:20px 28px;max-width:380px;width:80%;text-align:center;border:1px solid rgba(0,212,255,.2)}
+    .r-val{font-size:20px;font-weight:700;color:#00e676;word-break:break-all;line-height:1.3;margin:10px 0 4px}
+    .r-fmt{font-size:10px;color:#00d4ff}.r-tm{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px}
+    .r-btns{display:flex;gap:8px;margin-top:14px;justify-content:center;flex-wrap:wrap}
+    .r-btns button{padding:10px 18px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+    .rb-reg{background:#00e676;color:#000}
+    .rb-back{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.3)}
+    .rb-copy{background:rgba(0,212,255,.15);color:#00d4ff;border:1.5px solid rgba(0,212,255,.3)}
+    /* 스캔중 표시 */
+    .scan-indicator{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:30;pointer-events:none}
+    .scan-indicator.show{display:block}
+    .scan-indicator span{background:rgba(0,230,118,.8);color:#000;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:700;animation:pulse-ind .6s infinite}
+    @keyframes pulse-ind{0%,100%{opacity:1}50%{opacity:.5}}
+    .flash{position:absolute;top:0;left:0;width:100%;height:100%;background:#00e676;opacity:0;pointer-events:none;z-index:99;transition:opacity .1s}.flash.on{opacity:.2}
+    .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;padding:8px 18px;border-radius:18px;font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none}.toast.show{opacity:1}
   </style>
 </head>
 <body>
-<div class="app">
+
+<!-- ===== 메인 화면 ===== -->
+<div class="main" id="mainScreen">
+  <div class="main-hdr">
+    <h1>📷 바코드 스캐너</h1>
+    <p>바코드를 스캔하고 이력을 관리합니다</p>
+  </div>
+  <button class="scan-start-btn" onclick="openScan()">📷 스캔 등록</button>
+  <div class="m-section">
+    <div class="m-title"><span>📋 스캔 이력 (<span id="histCnt">0</span>건)</span><button onclick="clearHist()">전체삭제</button></div>
+    <div id="histList"><div class="m-empty">스캔 이력이 없습니다</div></div>
+  </div>
+  <div class="m-exp">
+    <button class="me-csv" onclick="expCSV()">📥 CSV 저장</button>
+    <button class="me-txt" onclick="expTXT()">📄 TXT 저장</button>
+  </div>
+</div>
+
+<!-- ===== 스캔 화면 (가로 풀스크린) ===== -->
+<div class="scan-screen" id="scanScreen">
   <video id="video" autoplay playsinline muted></video>
-  <div class="tap-area" id="tapArea"></div>
+  <div class="s-tap" id="tapArea"></div>
   <div class="focus-ring" id="focusRing"></div>
   <div class="focus-border" id="focusBorder"></div>
-  <div class="sharp-meter"><div class="sharp-fill" id="sharpFill"></div></div>
-  <div class="sharp-text" id="sharpText"></div>
-
+  <div class="sharp-m"><div class="sharp-f" id="sharpFill"></div></div>
+  <div class="sharp-t" id="sharpText"></div>
   <div class="mf-bar" id="mfBar">
-    <div class="mf-label"><span>🔍 수동초점</span><span class="mf-val" id="mfVal">--</span></div>
-    <input type="range" class="mf-range" id="mfRange" min="0" max="1" step="0.01" value="0.3" oninput="setMfDist(this.value)">
-    <div class="mf-icons"><span>🌸 가까이</span><span>🏔 멀리</span></div>
+    <div class="mf-top"><span>🔍 수동초점</span><span class="mf-v" id="mfVal">--</span></div>
+    <input type="range" id="mfRange" min="0" max="1" step="0.01" value="0.3" oninput="setMfDist(this.value)">
+    <div class="mf-ft"><span>가까이</span><span>멀리</span></div>
   </div>
-
-  <div class="ov" id="scanOv">
-    <div class="scan-box">
+  <div class="s-ov">
+    <div class="s-box" id="scanBox">
       <div class="sc-c sc-tl"></div><div class="sc-c sc-tr"></div><div class="sc-c sc-bl"></div><div class="sc-c sc-br"></div>
     </div>
   </div>
-
-  <div class="hud-top">
-    <h1>📷 바코드 스캐너</h1>
-    <span class="cnt" id="scanCnt">이력: 0건</span>
+  <div class="s-hud-top">
+    <button class="s-back" onclick="closeScan()">← 닫기</button>
+    <span id="scanStatus">미리보기</span>
   </div>
-
-  <div class="hint" id="hintTxt">초점을 맞춘 후 스캔 버튼을 누르세요</div>
-
-  <div class="hud-bot">
-    <button class="hud-btn on" id="btnAF" onclick="toggleAF()">AF</button>
-    <button class="hud-btn" id="btnTorch" onclick="toggleTorch()">🔦</button>
-    <button class="scan-trigger" id="btnScan" onclick="startScan()">스캔</button>
-    <div class="zm">
+  <div class="s-hint" id="sHint">화면을 터치하면 1회 스캔합니다</div>
+  <div class="s-hud-bot">
+    <button class="s-btn on" id="btnAF" onclick="toggleAF()">AF</button>
+    <button class="s-btn" id="btnTorch" onclick="toggleTorch()">🔦</button>
+    <div class="s-zm">
       <label>줌</label>
       <input type="range" id="zoomR" min="1" max="5" step="0.1" value="2" oninput="setZoom(this.value)">
       <span id="zoomV">2.0x</span>
     </div>
-    <button class="hud-btn" onclick="toggleHist()">📋</button>
   </div>
-
-  <!-- 결과 오버레이 -->
-  <div class="result-ov" id="resultOv">
+  <div class="scan-indicator" id="scanInd"><span>스캔 중...</span></div>
+  <div class="r-ov" id="resultOv">
     <div class="r-card">
-      <div style="font-size:12px;color:rgba(255,255,255,.5)">스캔 결과</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.5)">스캔 결과</div>
       <div class="r-val" id="rVal"></div>
       <div class="r-fmt" id="rFmt"></div>
       <div class="r-tm" id="rTm"></div>
       <div class="r-btns">
         <button class="rb-reg" onclick="registerCode()">✅ 등록</button>
-        <button class="rb-retry" onclick="retryScan()">🔄 재스캔</button>
+        <button class="rb-back" onclick="backToPreview()">🔄 재스캔</button>
         <button class="rb-copy" onclick="copyCode()">📋 복사</button>
       </div>
     </div>
   </div>
-
-  <!-- 이력 패널 -->
-  <div class="hist-panel" id="histPanel">
-    <div class="hp-top"><h3>📋 스캔 이력</h3><button class="hp-close" onclick="toggleHist()">✕</button></div>
-    <div class="hp-acts">
-      <button class="hpa-csv" onclick="expCSV()">CSV</button>
-      <button class="hpa-txt" onclick="expTXT()">TXT</button>
-      <button class="hpa-del" onclick="clearHist()">전체삭제</button>
-    </div>
-    <div id="histList"><div class="h-empty">스캔 이력이 없습니다</div></div>
-  </div>
-
   <div class="flash" id="flash"></div>
-  <div class="toast" id="toast"></div>
 </div>
+
+<div class="toast" id="toast"></div>
 <canvas id="scanCv" style="display:none"></canvas>
 
 <script>
-// 가로 모드 강제
-try{screen.orientation.lock('landscape').catch(()=>{})}catch(e){}
-
 let video,stream,track,cv,ctx;
 let scanning=false,afOn=true,torchOn=false;
 let hist=JSON.parse(localStorage.getItem('BC_HIST')||'[]');
-let lastCode='',lastTime=0;
+let lastCode='',lastTime=0,pendingCode=null;
 const DUP_DELAY=1500;
 let detector=null;
-let pendingCode=null;
+let mfMin=0,mfMax=1,sharpMax=0;
+let scanTimeout=null,sharpInterval=null;
+let edgeCv,edgeCtx;
 
-async function init(){
+// ===== 메인 화면 =====
+function renderHist(){
+  const c=document.getElementById('histList');
+  document.getElementById('histCnt').textContent=hist.length;
+  if(!hist.length){c.innerHTML='<div class="m-empty">스캔 이력이 없습니다</div>';return}
+  c.innerHTML='';
+  hist.slice(0,100).forEach((h,i)=>{
+    const d=document.createElement('div');d.className='m-item';
+    d.innerHTML=`<div class="m-num">${i+1}</div><div class="m-body"><div class="m-val">${esc(h.value)}</div><div class="m-meta">${h.format} · ${h.time}</div></div><button class="m-cp" onclick="cpVal('${esc(h.value)}')">📋</button>`;
+    c.appendChild(d);
+  });
+}
+function esc(s){return s.replace(/'/g,'&#39;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function clearHist(){if(!hist.length)return;if(!confirm('전체 이력 삭제?'))return;hist.length=0;localStorage.setItem('BC_HIST','[]');renderHist()}
+function cpVal(v){v=v.replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/&lt;/g,'<');navigator.clipboard.writeText(v).then(()=>showToast('복사: '+v)).catch(()=>{const t=document.createElement('textarea');t.value=v;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);showToast('복사: '+v)})}
+function expCSV(){if(!hist.length){showToast('이력 없음');return}let csv='\uFEFF번호,바코드,형식,시간\n';hist.forEach((h,i)=>{csv+=`${i+1},"${h.value}",${h.format},"${h.time}"\n`});dlF(csv,'바코드이력.csv','text/csv;charset=utf-8')}
+function expTXT(){if(!hist.length){showToast('이력 없음');return}dlF(hist.map(h=>h.value).join('\n'),'바코드목록.txt','text/plain;charset=utf-8')}
+function dlF(c,fn,tp){const b=new Blob([c],{type:tp}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;a.click();URL.revokeObjectURL(a.href)}
+
+// ===== 스캔 화면 열기/닫기 =====
+async function openScan(){
+  document.getElementById('scanScreen').classList.add('active');
+  document.body.style.overflow='hidden';
+  try{await screen.orientation.lock('landscape')}catch(e){}
+  if(!stream)await startCam();
+}
+function closeScan(){
+  scanning=false;
+  if(scanTimeout){clearTimeout(scanTimeout);scanTimeout=null}
+  if(sharpInterval){clearInterval(sharpInterval);sharpInterval=null}
+  document.getElementById('scanScreen').classList.remove('active');
+  document.body.style.overflow='';
+  try{screen.orientation.unlock()}catch(e){}
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;track=null}
+  renderHist();
+}
+
+async function startCam(){
   video=document.getElementById('video');
   cv=document.getElementById('scanCv');
   ctx=cv.getContext('2d',{willReadFrequently:true});
 
-  if('BarcodeDetector' in window){
-    try{
-      const fmts=await BarcodeDetector.getSupportedFormats();
-      detector=new BarcodeDetector({formats:fmts});
-    }catch(e){detector=null}
+  if(!detector&&'BarcodeDetector' in window){
+    try{const f=await BarcodeDetector.getSupportedFormats();detector=new BarcodeDetector({formats:f})}catch(e){}
   }
-
-  await startCam();
-  renderHist();
-  document.getElementById('scanCnt').textContent='이력: '+hist.length+'건';
-  document.getElementById('tapArea').addEventListener('click',onTapFocus);
-}
-
-async function startCam(){
   try{
-    stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:{exact:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false
-    });
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{exact:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
   }catch(e){
-    try{
-      stream=await navigator.mediaDevices.getUserMedia({
-        video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false
-      });
-    }catch(e2){document.getElementById('hintTxt').textContent='카메라 접근 실패';return}
+    try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false})}
+    catch(e2){showToast('카메라 접근 실패');return}
   }
   video.srcObject=stream;track=stream.getVideoTracks()[0];
   await new Promise(r=>video.onloadedmetadata=r);await video.play();
-
   const cap=track.getCapabilities?track.getCapabilities():{};
   if(cap.zoom){
-    const zr=document.getElementById('zoomR');
-    zr.min=cap.zoom.min;zr.max=Math.min(cap.zoom.max,8);
-    const iz=Math.min(2,cap.zoom.max);zr.value=iz;
-    document.getElementById('zoomV').textContent=iz.toFixed(1)+'x';
+    const zr=document.getElementById('zoomR');zr.min=cap.zoom.min;zr.max=Math.min(cap.zoom.max,8);
+    const iz=Math.min(2,cap.zoom.max);zr.value=iz;document.getElementById('zoomV').textContent=iz.toFixed(1)+'x';
     try{await track.applyConstraints({advanced:[{zoom:iz}]})}catch(e){}
   }
   await applyFocus();
   startSharpMonitor();
-  // 미리보기만 — 스캔 버튼 눌러야 스캔 시작
-  document.getElementById('scanOv').style.opacity='0.4';
+  // 탭 이벤트 바인딩
+  document.getElementById('tapArea').onclick=onTapScan;
 }
 
-let mfMin=0,mfMax=1,sharpMax=0;
-
-async function applyFocus(){
-  if(!track)return;const cap=track.getCapabilities?track.getCapabilities():{};
-  if(afOn){
-    document.getElementById('mfBar').classList.remove('show');
-    if(cap.focusMode){
-      if(cap.focusMode.includes('continuous'))try{await track.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
-      else if(cap.focusMode.includes('single-shot'))try{await track.applyConstraints({advanced:[{focusMode:'single-shot'}]})}catch(e){}
-    }
-  }else{
-    // MF 모드
-    if(cap.focusMode&&cap.focusMode.includes('manual')&&cap.focusDistance){
-      mfMin=cap.focusDistance.min;mfMax=cap.focusDistance.max;
-      const r=document.getElementById('mfRange');
-      r.min=mfMin;r.max=mfMax;r.step=((mfMax-mfMin)/200).toFixed(4);
-      r.value=(mfMin+(mfMax-mfMin)*0.3).toFixed(4);
-      document.getElementById('mfBar').classList.add('show');
-      setMfDist(r.value);
-    }else if(cap.focusMode&&cap.focusMode.includes('manual')){
-      // focusDistance 미지원이지만 manual 지원
-      try{await track.applyConstraints({advanced:[{focusMode:'manual'}]})}catch(e){}
-      document.getElementById('mfBar').classList.remove('show');
-      showToast('수동초점 — 줌으로 조절하세요');
-    }else{
-      document.getElementById('mfBar').classList.remove('show');
-      showToast('이 카메라는 수동초점 미지원');afOn=true;
-      document.getElementById('btnAF').classList.add('on');document.getElementById('btnAF').textContent='AF';
-    }
-  }
+// ===== 탭 → 1회 스캔 =====
+function onTapScan(e){
+  if(scanning)return; // 이미 스캔 중이면 무시
+  // 먼저 탭 초점 트리거
+  triggerFocus(e);
+  // 약간 딜레이 후 스캔 시작 (초점 잡힐 시간)
+  setTimeout(()=>startOneScan(),300);
 }
 
-async function setMfDist(v){
-  if(!track)return;v=parseFloat(v);
-  try{await track.applyConstraints({advanced:[{focusMode:'manual',focusDistance:v}]})}catch(e){}
-  const pct=mfMax>mfMin?((v-mfMin)/(mfMax-mfMin)*100).toFixed(0):0;
-  document.getElementById('mfVal').textContent=pct+'%';
-}
-
-async function toggleAF(){
-  afOn=!afOn;
-  const b=document.getElementById('btnAF');
-  b.classList.toggle('on',afOn);b.textContent=afOn?'AF':'MF';
-  sharpMax=0; // 리셋
-  await applyFocus();
-}
-
-// ===== 엣지 검출 (Laplacian variance) — 선명도 측정 =====
-let edgeCv,edgeCtx;
-function calcSharpness(videoEl){
-  if(!edgeCv){edgeCv=document.createElement('canvas');edgeCtx=edgeCv.getContext('2d',{willReadFrequently:true})}
-  // 중앙 작은 영역만 샘플링 (성능)
-  const sw=160,sh=80;
-  edgeCv.width=sw;edgeCv.height=sh;
-  const vw=videoEl.videoWidth,vh=videoEl.videoHeight;
-  const sx=(vw-sw*4)/2,sy=(vh-sh*4)/2;
-  edgeCtx.drawImage(videoEl,sx,sy,sw*4,sh*4,0,0,sw,sh);
-
-  const img=edgeCtx.getImageData(0,0,sw,sh);
-  const d=img.data;
-  // 그레이스케일 Laplacian
-  let sum=0,cnt=0;
-  for(let y=1;y<sh-1;y++){
-    for(let x=1;x<sw-1;x++){
-      const idx=(y*sw+x)*4;
-      const c=d[idx]*0.299+d[idx+1]*0.587+d[idx+2]*0.114; // center
-      const t=d[((y-1)*sw+x)*4]*0.299+d[((y-1)*sw+x)*4+1]*0.587+d[((y-1)*sw+x)*4+2]*0.114;
-      const b2=d[((y+1)*sw+x)*4]*0.299+d[((y+1)*sw+x)*4+1]*0.587+d[((y+1)*sw+x)*4+2]*0.114;
-      const l=d[(y*sw+x-1)*4]*0.299+d[(y*sw+x-1)*4+1]*0.587+d[(y*sw+x-1)*4+2]*0.114;
-      const r=d[(y*sw+x+1)*4]*0.299+d[(y*sw+x+1)*4+1]*0.587+d[(y*sw+x+1)*4+2]*0.114;
-      const lap=Math.abs(t+b2+l+r-4*c);
-      sum+=lap;cnt++;
-    }
-  }
-  return cnt>0?sum/cnt:0;
-}
-
-// 선명도 업데이트 루프
-let sharpInterval;
-function startSharpMonitor(){
-  if(sharpInterval)clearInterval(sharpInterval);
-  sharpInterval=setInterval(()=>{
-    if(!video||!video.videoWidth||video.paused)return;
-    const sharp=calcSharpness(video);
-    if(sharp>sharpMax)sharpMax=sharp;
-    const norm=sharpMax>0?Math.min(sharp/sharpMax,1):0;
-    const pct=Math.round(norm*100);
-
-    // 미터 표시
-    const fill=document.getElementById('sharpFill');
-    const txt=document.getElementById('sharpText');
-    const border=document.getElementById('focusBorder');
-    fill.style.height=pct+'%';
-
-    if(norm>0.75){
-      fill.style.background='#00e676';
-      txt.style.color='#00e676';txt.textContent='SHARP';
-      border.className='focus-border sharp';
-    }else if(norm>0.4){
-      fill.style.background='#ffc107';
-      txt.style.color='#ffc107';txt.textContent='';
-      border.className='focus-border mid';
-    }else{
-      fill.style.background='#ff5252';
-      txt.style.color='#ff5252';txt.textContent='';
-      border.className='focus-border blur';
-    }
-  },200);
-}
-
-
-async function onTapFocus(e){
+async function triggerFocus(e){
   if(!track)return;const cap=track.getCapabilities?track.getCapabilities():{};
   const rect=e.currentTarget.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
   const ring=document.getElementById('focusRing');
-  ring.style.left=x+'px';ring.style.top=y+'px';
-  ring.classList.add('show');setTimeout(()=>ring.classList.remove('show'),600);
+  ring.style.left=x+'px';ring.style.top=y+'px';ring.classList.add('show');setTimeout(()=>ring.classList.remove('show'),600);
   if(cap.pointsOfInterest)try{await track.applyConstraints({advanced:[{pointsOfInterest:[{x:x/rect.width,y:y/rect.height}]}]})}catch(e){}
-  if(cap.focusMode&&cap.focusMode.includes('single-shot')){
-    try{await track.applyConstraints({advanced:[{focusMode:'single-shot'}]})}catch(e){}
-    setTimeout(async()=>{if(afOn&&cap.focusMode.includes('continuous'))try{await track.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}},1000);
-  }
+  if(cap.focusMode&&cap.focusMode.includes('single-shot'))try{await track.applyConstraints({advanced:[{focusMode:'single-shot'}]})}catch(e){}
 }
 
-let scanTimeout=null;
-
-function startScan(){
+function startOneScan(){
   if(scanning)return;
-  const btn=document.getElementById('btnScan');
-  btn.classList.add('scanning');btn.textContent='...';
-  document.getElementById('scanOv').style.opacity='1';
-  document.getElementById('hintTxt').textContent='스캔 중...';
   scanning=true;
+  document.getElementById('scanBox').classList.add('active');
+  document.getElementById('scanInd').classList.add('show');
+  document.getElementById('scanStatus').textContent='스캔 중...';
+  document.getElementById('sHint').textContent='';
   scanLoop();
-  // 5초 타임아웃
   scanTimeout=setTimeout(()=>{
     if(scanning){
-      scanning=false;
-      btn.classList.remove('scanning');btn.textContent='스캔';
-      document.getElementById('scanOv').style.opacity='0.4';
-      document.getElementById('hintTxt').textContent='인식 실패 — 초점/위치 조정 후 다시 시도';
+      stopScan();
+      document.getElementById('sHint').textContent='인식 실패 — 다시 터치하세요';
+      document.getElementById('scanStatus').textContent='미리보기';
       showToast('바코드를 인식하지 못했습니다');
     }
-  },5000);
+  },4000);
 }
 
 function stopScan(){
   scanning=false;
   if(scanTimeout){clearTimeout(scanTimeout);scanTimeout=null}
-  const btn=document.getElementById('btnScan');
-  btn.classList.remove('scanning');btn.textContent='스캔';
-  document.getElementById('scanOv').style.opacity='0.4';
+  document.getElementById('scanBox').classList.remove('active');
+  document.getElementById('scanInd').classList.remove('show');
 }
 
 function scanLoop(){if(!scanning)return;decode().then(()=>{if(scanning)requestAnimationFrame(scanLoop)})}
 
-
 async function decode(){
-  if(!video.videoWidth||video.paused)return;
+  if(!video||!video.videoWidth||video.paused)return;
   const vw=video.videoWidth,vh=video.videoHeight;
   const cw=Math.floor(vw*0.75),ch=Math.floor(vh*0.3);
   const cx=Math.floor((vw-cw)/2),cy=Math.floor((vh-ch)/2);
   cv.width=cw;cv.height=ch;ctx.drawImage(video,cx,cy,cw,ch,0,0,cw,ch);
-  // 대비 강화
-  try{const id=ctx.getImageData(0,0,cw,ch),d=id.data,f=1.3;
-    for(let i=0;i<d.length;i+=4){d[i]=cl(f*(d[i]-128)+128);d[i+1]=cl(f*(d[i+1]-128)+128);d[i+2]=cl(f*(d[i+2]-128)+128)}
+  try{const id=ctx.getImageData(0,0,cw,ch),d=id.data;
+    for(let i=0;i<d.length;i+=4){d[i]=cl(1.3*(d[i]-128)+128);d[i+1]=cl(1.3*(d[i+1]-128)+128);d[i+2]=cl(1.3*(d[i+2]-128)+128)}
     ctx.putImageData(id,0,0)}catch(e){}
   if(detector){
     try{const r=await detector.detect(cv);if(r.length>0){onDecoded(r[0].rawValue,r[0].format);return}}catch(e){}
@@ -424,76 +310,98 @@ function onDecoded(val,fmt){
   if(!val)return;const now=Date.now();
   if(val===lastCode&&now-lastTime<DUP_DELAY)return;
   lastCode=val;lastTime=now;
-
   const fl=document.getElementById('flash');fl.classList.add('on');setTimeout(()=>fl.classList.remove('on'),150);
   if(navigator.vibrate)navigator.vibrate([50,30,50]);
-
   const ts=new Date().toLocaleString('ko-KR'),fn=fmtN(fmt);
   document.getElementById('rVal').textContent=val;
   document.getElementById('rFmt').textContent='형식: '+fn;
   document.getElementById('rTm').textContent=ts;
   pendingCode={value:val,format:fn,time:ts,ts:now};
-
-  // 스캔 멈추고 결과 표시
   stopScan();
-  document.getElementById('scanOv').style.display='none';
   document.getElementById('resultOv').classList.add('show');
-  document.getElementById('hintTxt').textContent='';
+  document.getElementById('scanStatus').textContent='결과';
+  document.getElementById('sHint').textContent='';
 }
 
 function registerCode(){
-  if(!pendingCode){showToast('스캔된 바코드 없음');return}
-  if(hist.find(h=>h.value===pendingCode.value&&h.ts===pendingCode.ts)){showToast('이미 등록됨');retryScan();return}
+  if(!pendingCode){showToast('없음');return}
+  if(hist.find(h=>h.value===pendingCode.value&&h.ts===pendingCode.ts)){showToast('이미 등록됨');backToPreview();return}
   hist.unshift({...pendingCode});if(hist.length>200)hist.length=200;
   localStorage.setItem('BC_HIST',JSON.stringify(hist));
-  document.getElementById('scanCnt').textContent='이력: '+hist.length+'건';
-  renderHist();showToast('✅ 등록: '+pendingCode.value);
-  pendingCode=null;retryScan();
+  showToast('✅ 등록: '+pendingCode.value);
+  pendingCode=null;backToPreview();
 }
-
-function retryScan(){
+function backToPreview(){
   document.getElementById('resultOv').classList.remove('show');
-  document.getElementById('scanOv').style.display='';
-  document.getElementById('scanOv').style.opacity='0.4';
-  document.getElementById('hintTxt').textContent='초점을 맞춘 후 스캔 버튼을 누르세요';
+  document.getElementById('scanStatus').textContent='미리보기';
+  document.getElementById('sHint').textContent='화면을 터치하면 1회 스캔합니다';
 }
-
 function copyCode(){
   const v=document.getElementById('rVal').textContent;if(!v)return;
   navigator.clipboard.writeText(v).then(()=>showToast('복사됨')).catch(()=>{
     const t=document.createElement('textarea');t.value=v;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);showToast('복사됨');
   });
 }
-
 function fmtN(f){const m={'qr_code':'QR','ean_13':'EAN-13','ean_8':'EAN-8','code_128':'Code128','code_39':'Code39','code_93':'Code93','codabar':'Codabar','itf':'ITF','upc_a':'UPC-A','upc_e':'UPC-E','data_matrix':'DataMatrix','pdf417':'PDF417','aztec':'Aztec'};if(!f)return'?';return m[f.toString().toLowerCase().replace(/ /g,'_')]||f.toString()}
 
-// 컨트롤
-// 컨트롤 (AF는 위에서 정의)
-async function toggleTorch(){if(!track)return;const c=track.getCapabilities?track.getCapabilities():{};if(!c.torch){showToast('조명 미지원');return}torchOn=!torchOn;try{await track.applyConstraints({advanced:[{torch:torchOn}]})}catch(e){}document.getElementById('btnTorch').classList.toggle('on',torchOn)}
-async function setZoom(v){if(!track)return;v=parseFloat(v);try{await track.applyConstraints({advanced:[{zoom:v}]})}catch(e){}document.getElementById('zoomV').textContent=v.toFixed(1)+'x'}
-
-// 이력 패널
-function toggleHist(){document.getElementById('histPanel').classList.toggle('open')}
-function renderHist(){
-  const c=document.getElementById('histList');
-  if(!hist.length){c.innerHTML='<div class="h-empty">스캔 이력이 없습니다</div>';return}
-  c.innerHTML='';hist.slice(0,100).forEach((h,i)=>{
-    const d=document.createElement('div');d.className='h-item';
-    d.innerHTML=`<div class="h-num">${i+1}</div><div class="h-body"><div class="h-val">${esc(h.value)}</div><div class="h-meta">${h.format} · ${h.time}</div></div><button class="h-cp" onclick="cpVal('${esc(h.value)}')">📋</button>`;
-    c.appendChild(d)});
+// ===== 초점 / 카메라 제어 =====
+async function applyFocus(){
+  if(!track)return;const cap=track.getCapabilities?track.getCapabilities():{};
+  if(afOn){
+    document.getElementById('mfBar').classList.remove('show');
+    if(cap.focusMode){
+      if(cap.focusMode.includes('continuous'))try{await track.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
+      else if(cap.focusMode.includes('single-shot'))try{await track.applyConstraints({advanced:[{focusMode:'single-shot'}]})}catch(e){}
+    }
+  }else{
+    if(cap.focusMode&&cap.focusMode.includes('manual')&&cap.focusDistance){
+      mfMin=cap.focusDistance.min;mfMax=cap.focusDistance.max;
+      const r=document.getElementById('mfRange');r.min=mfMin;r.max=mfMax;r.step=((mfMax-mfMin)/200).toFixed(4);
+      r.value=(mfMin+(mfMax-mfMin)*0.3).toFixed(4);
+      document.getElementById('mfBar').classList.add('show');setMfDist(r.value);
+    }else{showToast('수동초점 미지원');afOn=true;document.getElementById('btnAF').classList.add('on');document.getElementById('btnAF').textContent='AF';document.getElementById('mfBar').classList.remove('show')}
+  }
 }
-function esc(s){return s.replace(/'/g,'&#39;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
-function clearHist(){if(!hist.length)return;if(!confirm('전체 이력 삭제?'))return;hist.length=0;localStorage.setItem('BC_HIST','[]');document.getElementById('scanCnt').textContent='이력: 0건';renderHist()}
-function cpVal(v){v=v.replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/&lt;/g,'<');navigator.clipboard.writeText(v).then(()=>showToast('복사: '+v)).catch(()=>{const t=document.createElement('textarea');t.value=v;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);showToast('복사: '+v)})}
+async function setMfDist(v){if(!track)return;v=parseFloat(v);try{await track.applyConstraints({advanced:[{focusMode:'manual',focusDistance:v}]})}catch(e){}document.getElementById('mfVal').textContent=(mfMax>mfMin?((v-mfMin)/(mfMax-mfMin)*100).toFixed(0):0)+'%'}
+async function toggleAF(){afOn=!afOn;document.getElementById('btnAF').classList.toggle('on',afOn);document.getElementById('btnAF').textContent=afOn?'AF':'MF';sharpMax=0;await applyFocus()}
+async function toggleTorch(){if(!track)return;const c=track.getCapabilities?track.getCapabilities():{};if(!c.torch){showToast('조명 미지원');return}torchOn=!torchOn;try{await track.applyConstraints({advanced:[{torch:torchOn}]})}catch(e){}document.getElementById('btnTorch').classList.toggle('on',torchOn)}
+async function setZoom(v){if(!track)return;try{await track.applyConstraints({advanced:[{zoom:parseFloat(v)}]})}catch(e){}document.getElementById('zoomV').textContent=parseFloat(v).toFixed(1)+'x'}
 
-// 내보내기
-function expCSV(){if(!hist.length){showToast('이력 없음');return}let csv='\uFEFF번호,바코드,형식,시간\n';hist.forEach((h,i)=>{csv+=`${i+1},"${h.value}",${h.format},"${h.time}"\n`});dlF(csv,'바코드이력.csv','text/csv;charset=utf-8')}
-function expTXT(){if(!hist.length){showToast('이력 없음');return}dlF(hist.map(h=>h.value).join('\n'),'바코드목록.txt','text/plain;charset=utf-8')}
-function dlF(c,fn,tp){const b=new Blob([c],{type:tp}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;a.click();URL.revokeObjectURL(a.href)}
+// ===== 선명도 모니터 =====
+function calcSharpness(){
+  if(!edgeCv){edgeCv=document.createElement('canvas');edgeCtx=edgeCv.getContext('2d',{willReadFrequently:true})}
+  const sw=160,sh=80;edgeCv.width=sw;edgeCv.height=sh;
+  const vw=video.videoWidth,vh=video.videoHeight;
+  edgeCtx.drawImage(video,(vw-sw*4)/2,(vh-sh*4)/2,sw*4,sh*4,0,0,sw,sh);
+  const img=edgeCtx.getImageData(0,0,sw,sh),d=img.data;let sum=0,cnt=0;
+  for(let y=1;y<sh-1;y++)for(let x=1;x<sw-1;x++){
+    const i=(y*sw+x)*4,c=d[i]*.299+d[i+1]*.587+d[i+2]*.114;
+    const t=d[((y-1)*sw+x)*4]*.299+d[((y-1)*sw+x)*4+1]*.587+d[((y-1)*sw+x)*4+2]*.114;
+    const b=d[((y+1)*sw+x)*4]*.299+d[((y+1)*sw+x)*4+1]*.587+d[((y+1)*sw+x)*4+2]*.114;
+    const l=d[(y*sw+x-1)*4]*.299+d[(y*sw+x-1)*4+1]*.587+d[(y*sw+x-1)*4+2]*.114;
+    const r=d[(y*sw+x+1)*4]*.299+d[(y*sw+x+1)*4+1]*.587+d[(y*sw+x+1)*4+2]*.114;
+    sum+=Math.abs(t+b+l+r-4*c);cnt++;
+  }
+  return cnt>0?sum/cnt:0;
+}
+function startSharpMonitor(){
+  if(sharpInterval)clearInterval(sharpInterval);
+  sharpInterval=setInterval(()=>{
+    if(!video||!video.videoWidth||video.paused)return;
+    const s=calcSharpness();if(s>sharpMax)sharpMax=s;
+    const n=sharpMax>0?Math.min(s/sharpMax,1):0,p=Math.round(n*100);
+    const fill=document.getElementById('sharpFill'),txt=document.getElementById('sharpText'),bdr=document.getElementById('focusBorder');
+    fill.style.height=p+'%';
+    if(n>.75){fill.style.background='#00e676';txt.style.color='#00e676';txt.textContent='SHARP';bdr.className='focus-border sharp'}
+    else if(n>.4){fill.style.background='#ffc107';txt.style.color='#ffc107';txt.textContent='';bdr.className='focus-border mid'}
+    else{fill.style.background='#ff5252';txt.style.color='#ff5252';txt.textContent='';bdr.className='focus-border'}
+  },200);
+}
 
 let tt;function showToast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),2000)}
 
-init();
+// 초기화
+renderHist();
 </script>
 </body>
 </html>
