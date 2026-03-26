@@ -3,312 +3,379 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>바코드 스캐너</title>
+  <title>입고 로트추적 스캐너</title>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Noto Sans KR',sans-serif;background:#f5f5f5;color:#212121}
-
-    /* 메인 */
-    .hdr{background:linear-gradient(135deg,#1a237e,#283593);color:#fff;padding:14px 16px;text-align:center}
-    .hdr h1{font-size:18px;font-weight:700}
-    .hdr p{font-size:11px;opacity:.7;margin-top:2px}
-
-    .scan-btn{display:flex;align-items:center;justify-content:center;gap:8px;margin:16px;padding:14px;background:linear-gradient(135deg,#00c853,#00e676);color:#000;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 3px 12px rgba(0,200,83,.3);width:calc(100% - 32px)}
-    .scan-btn:active{transform:scale(.97)}
-
-    /* 결과 카드 */
-    .result-card{margin:12px 16px;background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-    .rc-label{font-size:11px;color:#888;margin-bottom:4px}
-    .rc-value{font-size:20px;font-weight:700;color:#2e7d32;word-break:break-all;line-height:1.3}
-    .rc-fmt{font-size:11px;color:#1565c0;margin-top:3px}
-    .rc-time{font-size:10px;color:#999;margin-top:2px}
-    .rc-preview{margin-top:8px;border-radius:8px;max-width:100%;max-height:120px;object-fit:contain;border:1px solid #eee}
-    .rc-acts{display:flex;gap:8px;margin-top:10px}
-    .rc-acts button{flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
-    .rca-reg{background:#00e676;color:#000}
-    .rca-retry{background:#f5f5f5;color:#555;border:1px solid #ddd}
-    .rca-copy{background:#e3f2fd;color:#1565c0}
-
+    body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f5;color:#212121;padding-bottom:60px}
+    /* 헤더 */
+    .hdr{background:linear-gradient(135deg,#1a237e,#283593);color:#fff;padding:12px 16px;text-align:center}
+    .hdr h1{font-size:17px;font-weight:700}.hdr p{font-size:10px;opacity:.7;margin-top:2px}
+    /* 탭 */
+    .tabs{display:flex;background:#fff;border-bottom:2px solid #e0e0e0;position:sticky;top:0;z-index:50}
+    .tab{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;color:#888}
+    .tab.on{color:#1a237e;border-bottom-color:#1a237e}
+    /* 패널 */
+    .pnl{display:none;padding:12px}.pnl.on{display:block}
+    /* 카드 */
+    .card{background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    .card-tit{font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+    /* 입력 */
+    .fg{margin-bottom:12px}
+    .fg label{display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px}
+    .fg select,.fg input,.fg textarea{width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;background:#fff}
+    .fg select{appearance:auto}
+    .fg textarea{resize:vertical;min-height:48px}
+    /* 버튼 */
+    .btn{padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;width:100%}
+    .btn:active{transform:scale(.97)}
+    .btn-green{background:linear-gradient(135deg,#00c853,#00e676);color:#000;box-shadow:0 2px 8px rgba(0,200,83,.2)}
+    .btn-blue{background:linear-gradient(135deg,#1565c0,#42a5f5);color:#fff;box-shadow:0 2px 8px rgba(21,101,192,.2)}
+    .btn-red{background:#ffebee;color:#c62828;border:1px solid #ffcdd2}
+    .btn-gray{background:#f5f5f5;color:#555;border:1px solid #ddd}
+    .btn-sm{padding:8px 12px;font-size:12px;width:auto;border-radius:8px}
+    .btn-row{display:flex;gap:8px;margin-bottom:12px}
+    .btn-row .btn{flex:1}
+    /* 스캔결과 */
+    .scan-result{background:#e8f5e9;border:1.5px solid #a5d6a7;border-radius:10px;padding:12px;margin-bottom:12px;display:none}
+    .scan-result.show{display:block}
+    .scan-result.fail{background:#ffebee;border-color:#ef9a9a}
+    .sr-val{font-size:18px;font-weight:700;color:#2e7d32;word-break:break-all}
+    .scan-result.fail .sr-val{color:#c62828}
+    .sr-fmt{font-size:11px;color:#1565c0;margin-top:2px}
+    .sr-img{max-width:100%;max-height:100px;border-radius:6px;margin-top:6px;border:1px solid #ddd}
     /* 이력 */
-    .sec{margin:0 12px 12px;background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-    .sec-tit{font-size:14px;font-weight:700;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
-    .sec-tit button{padding:4px 10px;border:1px solid #ffcdd2;border-radius:6px;background:none;color:#c62828;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
-    .h-empty{text-align:center;padding:16px;color:#aaa;font-size:13px}
-    .h-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5}.h-item:last-child{border:none}
-    .h-num{width:24px;height:24px;border-radius:6px;background:#e3f2fd;color:#1565c0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
-    .h-body{flex:1;min-width:0}.h-val{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .h-meta{font-size:9px;color:#999;margin-top:1px}
-    .h-cp{width:26px;height:26px;border:none;border-radius:6px;background:#f5f5f5;color:#888;font-size:12px;cursor:pointer;flex-shrink:0}
-    .exp-row{display:flex;gap:8px;margin:0 12px 16px}
-    .exp-row button{flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
-    .e-csv{background:#1b5e20;color:#fff}.e-txt{background:#f5f5f5;color:#555;border:1px solid #ddd}
-
-    /* 카메라 입력 숨김 */
-    #camInput{display:none}
-    /* 분석 캔버스 숨김 */
-    #analysisCv{display:none}
-
-    .toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;padding:8px 18px;border-radius:18px;font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none}.toast.show{opacity:1}
+    .h-empty{text-align:center;padding:20px;color:#aaa;font-size:13px}
+    .h-item{padding:10px 0;border-bottom:1px solid #f0f0f0}
+    .h-item:last-child{border:none}
+    .hi-top{display:flex;justify-content:space-between;align-items:center}
+    .hi-code{font-size:14px;font-weight:700;color:#1a237e}
+    .hi-time{font-size:10px;color:#999}
+    .hi-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+    .hi-tag{font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600}
+    .ht-cat{background:#e3f2fd;color:#1565c0}
+    .ht-sub{background:#f3e5f5;color:#7b1fa2}
+    .ht-qty{background:#e8f5e9;color:#2e7d32}
+    .hi-note{font-size:11px;color:#666;margin-top:3px}
+    .hi-acts{display:flex;gap:4px;margin-top:4px}
+    .hi-acts button{padding:3px 8px;border:none;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit}
+    .ha-cp{background:#e3f2fd;color:#1565c0}.ha-del{background:#ffebee;color:#c62828}
+    /* 항목관리 */
+    .cat-section{margin-bottom:14px;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden}
+    .cat-hdr{display:flex;align-items:center;gap:6px;padding:10px 12px;background:#f5f5f5;cursor:pointer}
+    .cat-hdr input{flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit;font-weight:600}
+    .cat-body{padding:8px 12px;background:#fafafa}
+    .sub-item{display:flex;align-items:center;gap:4px;padding:4px 0;border-bottom:1px solid #eee;font-size:13px}
+    .sub-item:last-child{border:none}
+    .sub-item input{flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:5px;font-size:12px;font-family:inherit}
+    .s-move{width:24px;height:24px;border:none;border-radius:4px;background:#f0f0f0;font-size:12px;cursor:pointer;color:#888;display:flex;align-items:center;justify-content:center}
+    .s-del{width:24px;height:24px;border:none;border-radius:4px;background:#ffebee;color:#c62828;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center}
+    .add-btn{width:100%;padding:6px;border:1.5px dashed #ccc;border-radius:6px;background:none;color:#999;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:4px}
+    /* 숨김 */
+    #camInput,#imgInput,#analysisCv{display:none}
+    .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;padding:8px 18px;border-radius:18px;font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none}.toast.show{opacity:1}
   </style>
 </head>
 <body>
-
-<div class="hdr">
-  <h1>📷 바코드 스캐너</h1>
-  <p>사진 촬영 또는 이미지 불러오기로 바코드 분석</p>
+<div class="hdr"><h1>📦 입고 로트추적 스캐너</h1><p>바코드 스캔 기반 입고/이력 관리</p></div>
+<div class="tabs">
+  <div class="tab on" id="tab0" onclick="swTab(0)">📝 등록</div>
+  <div class="tab" id="tab1" onclick="swTab(1)">📋 이력</div>
+  <div class="tab" id="tab2" onclick="swTab(2)">⚙ 항목관리</div>
 </div>
 
-<!-- 초기 화면: 버튼 중앙 -->
-<div id="homeScreen" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 60px);padding:0 24px;gap:16px">
-  <button class="scan-btn" onclick="takePhoto()" style="margin:0;width:100%;max-width:320px;font-size:17px;padding:20px">📷 사진촬영 스캔</button>
-  <button class="scan-btn" onclick="loadImage()" style="margin:0;width:100%;max-width:320px;font-size:17px;padding:20px;background:linear-gradient(135deg,#1565c0,#42a5f5);box-shadow:0 3px 12px rgba(21,101,192,.3)">🖼 이미지 불러오기</button>
-  <div style="font-size:11px;color:#aaa;margin-top:8px" id="homeHistInfo"></div>
+<!-- ===== 등록 ===== -->
+<div class="pnl on" id="pnl0">
+  <div class="card">
+    <div class="card-tit">📦 입고 등록</div>
+    <div class="fg">
+      <label>대항목</label>
+      <select id="selCat" onchange="onCatChange()"><option value="">선택하세요</option></select>
+    </div>
+    <div class="fg">
+      <label>소항목</label>
+      <select id="selSub"><option value="">선택하세요</option></select>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-tit">📷 바코드 스캔</div>
+    <div class="btn-row">
+      <button class="btn btn-green" onclick="takePhoto()">📷 사진촬영</button>
+      <button class="btn btn-blue" onclick="loadImage()">🖼 이미지</button>
+    </div>
+    <div class="scan-result" id="scanResult">
+      <div class="sr-val" id="srVal"></div>
+      <div class="sr-fmt" id="srFmt"></div>
+      <img class="sr-img" id="srImg" style="display:none">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-tit">📝 추가 정보</div>
+    <div class="fg">
+      <label>수량</label>
+      <input type="number" id="inpQty" placeholder="수량 입력" inputmode="numeric">
+    </div>
+    <div class="fg">
+      <label>비고</label>
+      <textarea id="inpNote" placeholder="비고 사항 입력"></textarea>
+    </div>
+  </div>
+
+  <button class="btn btn-green" id="btnSave" onclick="saveEntry()" style="font-size:16px;padding:14px">✅ 등록 저장</button>
 </div>
 
-<!-- 결과/이력 화면 -->
-<div id="resultScreen" style="display:none">
-<div class="result-card show" id="resultCard">
-  <div class="rc-label" id="rcLabel">분석 결과</div>
-  <div class="rc-value" id="rcValue"></div>
-  <div class="rc-fmt" id="rcFmt"></div>
-  <div class="rc-time" id="rcTime"></div>
-  <img class="rc-preview" id="rcPreview" style="display:none">
-  <div class="rc-acts">
-    <button class="rca-reg" id="btnReg" onclick="registerCode()">✅ 등록</button>
-    <button class="rca-copy" onclick="copyResult()">📋 복사</button>
-    <button class="rca-retry" onclick="takePhoto()">📷 재촬영</button>
-    <button class="rca-retry" onclick="loadImage()" style="background:#e3f2fd;color:#1565c0;border-color:#90caf9">🖼 이미지</button>
+<!-- ===== 이력 ===== -->
+<div class="pnl" id="pnl1">
+  <div class="card">
+    <div class="card-tit" style="justify-content:space-between">
+      <span>📋 입고 이력 (<span id="histCnt">0</span>건)</span>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-sm btn-gray" onclick="expXlsx()">📥 엑셀</button>
+        <button class="btn btn-sm btn-red" onclick="clearHist()">전체삭제</button>
+      </div>
+    </div>
+    <!-- 필터 -->
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <select id="filtCat" onchange="renderHist()" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:inherit"><option value="">전체 대항목</option></select>
+      <input type="date" id="filtDate" onchange="renderHist()" style="padding:6px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:inherit">
+    </div>
+    <div id="histList"><div class="h-empty">이력이 없습니다</div></div>
   </div>
 </div>
 
-<div class="sec">
-  <div class="sec-tit"><span>📋 스캔 이력 (<span id="histCnt">0</span>건)</span><button onclick="clearHist()">전체삭제</button></div>
-  <div id="histList"><div class="h-empty">스캔 이력이 없습니다</div></div>
+<!-- ===== 항목관리 ===== -->
+<div class="pnl" id="pnl2">
+  <div class="card">
+    <div class="card-tit" style="justify-content:space-between">
+      <span>⚙ 대항목 / 소항목 관리</span>
+      <button class="btn btn-sm btn-gray" onclick="resetCats()">기본값</button>
+    </div>
+    <div id="catEditor"></div>
+    <button class="add-btn" onclick="addCat()" style="margin-top:8px;padding:10px;font-size:13px">+ 대항목 추가</button>
+    <div style="margin-top:12px">
+      <button class="btn btn-green" onclick="saveCats()">적용 저장</button>
+    </div>
+  </div>
 </div>
-<div class="exp-row">
-  <button class="e-csv" onclick="expCSV()">📥 CSV</button>
-  <button class="e-txt" onclick="expTXT()">📄 TXT</button>
-</div>
-<div style="text-align:center;padding:0 12px 20px">
-  <button onclick="goHome()" style="width:100%;padding:12px;border:1.5px solid #ddd;border-radius:10px;background:#fff;color:#555;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">← 처음으로</button>
-</div>
-</div><!-- resultScreen 닫기 -->
 
 <input type="file" id="camInput" accept="image/*" capture="environment">
 <input type="file" id="imgInput" accept="image/*">
 <canvas id="analysisCv"></canvas>
-
 <div class="toast" id="toast"></div>
 
 <script>
-let hist=JSON.parse(localStorage.getItem('BC_HIST')||'[]');
-let pendingCode=null;
+// ===== 기본 데이터 =====
+const DEFAULT_CATS=[
+  {name:'소재',subs:['코일','환봉','파이프','판재','기타']},
+  {name:'부품',subs:['볼트','너트','베어링','씰','기타']},
+  {name:'포장재',subs:['박스','파레트','비닐','기타']},
+  {name:'소모품',subs:['오일','그리스','공구','기타']}
+];
 
-// ===== 사진 촬영 / 이미지 불러오기 =====
-function takePhoto(){
-  document.getElementById('camInput').click();
+let cats=JSON.parse(localStorage.getItem('LOT_CATS')||'null')||JSON.parse(JSON.stringify(DEFAULT_CATS));
+let hist=JSON.parse(localStorage.getItem('LOT_HIST')||'[]');
+let pendingScan=null; // {value,format}
+
+// ===== 탭 =====
+function swTab(n){
+  document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('on',i===n)});
+  document.querySelectorAll('.pnl').forEach((p,i)=>{p.classList.toggle('on',i===n)});
+  if(n===0){renderSelects()}
+  if(n===1){renderHistFilter();renderHist()}
+  if(n===2){renderCatEditor()}
 }
-function loadImage(){
-  document.getElementById('imgInput').click();
+
+// ===== 등록 탭: 항목 셀렉트 =====
+function renderSelects(){
+  const sc=document.getElementById('selCat'),ss=document.getElementById('selSub');
+  const prev=sc.value;
+  sc.innerHTML='<option value="">선택하세요</option>';
+  cats.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;sc.appendChild(o)});
+  if(prev)sc.value=prev;
+  onCatChange();
 }
+function onCatChange(){
+  const ss=document.getElementById('selSub'),cat=cats.find(c=>c.name===document.getElementById('selCat').value);
+  ss.innerHTML='<option value="">선택하세요</option>';
+  if(cat)cat.subs.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;ss.appendChild(o)});
+}
+
+// ===== 사진/이미지 =====
+function takePhoto(){document.getElementById('camInput').click()}
+function loadImage(){document.getElementById('imgInput').click()}
+document.getElementById('camInput').addEventListener('change',e=>{handleFile(e.target.files[0]);e.target.value=''});
+document.getElementById('imgInput').addEventListener('change',e=>{handleFile(e.target.files[0]);e.target.value=''});
 
 function handleFile(file){
   if(!file)return;
-  // 결과 화면으로 전환
-  document.getElementById('homeScreen').style.display='none';
-  document.getElementById('resultScreen').style.display='block';
-  const card=document.getElementById('resultCard');
-  card.classList.add('show');
-  document.getElementById('rcLabel').textContent='분석 중...';
-  document.getElementById('rcValue').textContent='';
-  document.getElementById('rcFmt').textContent='';
-  document.getElementById('rcTime').textContent='';
-  document.getElementById('btnReg').disabled=true;
-
-  const preview=document.getElementById('rcPreview');
+  const sr=document.getElementById('scanResult');
+  sr.classList.add('show');sr.classList.remove('fail');
+  document.getElementById('srVal').textContent='분석 중...';
+  document.getElementById('srFmt').textContent='';
   const imgUrl=URL.createObjectURL(file);
-  preview.src=imgUrl;
-  preview.style.display='block';
-
+  const preview=document.getElementById('srImg');
+  preview.src=imgUrl;preview.style.display='block';
   const img=new Image();
-  img.onload=async()=>{
-    URL.revokeObjectURL(imgUrl);
-    await analyzeBarcode(img);
-  };
+  img.onload=async()=>{URL.revokeObjectURL(imgUrl);await analyzeBarcode(img)};
   img.src=URL.createObjectURL(file);
 }
 
-function goHome(){
-  document.getElementById('resultScreen').style.display='none';
-  document.getElementById('homeScreen').style.display='flex';
-  updateHomeInfo();
-}
-
-function updateHomeInfo(){
-  const el=document.getElementById('homeHistInfo');
-  if(hist.length)el.textContent='이력 '+hist.length+'건 저장됨';
-  else el.textContent='';
-}
-
-document.getElementById('camInput').addEventListener('change',function(e){
-  handleFile(e.target.files[0]);e.target.value='';
-});
-document.getElementById('imgInput').addEventListener('change',function(e){
-  handleFile(e.target.files[0]);e.target.value='';
-});
-
-// ===== 바코드 분석 =====
 async function analyzeBarcode(img){
-  const cv=document.getElementById('analysisCv');
-  const ctx=cv.getContext('2d');
-
-  // 중앙 가로 8:1 크롭 (바코드 영역만)
-  const cropW=img.width;
-  const cropH=Math.floor(img.width/8);
-  const cropY=Math.floor((img.height-cropH)/2);
-  cv.width=cropW;
-  cv.height=cropH;
-  ctx.drawImage(img,0,cropY,cropW,cropH,0,0,cropW,cropH);
-
+  const cv=document.getElementById('analysisCv'),ctx=cv.getContext('2d');
+  // 중앙 가로 8:1 크롭
+  const cropW=img.width,cropH=Math.floor(img.width/8),cropY=Math.floor((img.height-cropH)/2);
+  cv.width=cropW;cv.height=cropH;ctx.drawImage(img,0,cropY,cropW,cropH,0,0,cropW,cropH);
   let found=false;
-
-  // 1차: 크롭 영역에서 BarcodeDetector
+  // 1: BarcodeDetector 크롭
   if('BarcodeDetector' in window){
-    try{
-      const detector=new BarcodeDetector({formats:await BarcodeDetector.getSupportedFormats()});
-      const results=await detector.detect(cv);
-      if(results.length>0){showResult(results[0].rawValue,results[0].format);found=true}
-    }catch(e){}
+    try{const det=new BarcodeDetector({formats:await BarcodeDetector.getSupportedFormats()});const r=await det.detect(cv);if(r.length>0){scanOk(r[0].rawValue,r[0].format);found=true}}catch(e){}
   }
-
-  // 2차: 크롭 영역에서 html5-qrcode
-  if(!found){
-    try{
-      const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',0.95));
-      const file=new File([blob],'scan.jpg',{type:'image/jpeg'});
-      const qr=new Html5Qrcode('analysisCv');
-      const result=await qr.scanFileV2(file,true);
-      if(result&&result.decodedText){showResult(result.decodedText,result.result&&result.result.format?result.result.format.formatName:'unknown');found=true}
-      qr.clear();
-    }catch(e){}
+  // 2: html5-qrcode 크롭
+  if(!found){try{const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',.95));const f=new File([blob],'s.jpg',{type:'image/jpeg'});const qr=new Html5Qrcode('analysisCv');const res=await qr.scanFileV2(f,true);if(res&&res.decodedText){scanOk(res.decodedText,res.result&&res.result.format?res.result.format.formatName:'unknown');found=true}qr.clear()}catch(e){}}
+  // 3: 이진화 크롭
+  if(!found){try{const id=ctx.getImageData(0,0,cropW,cropH),d=id.data;for(let i=0;i<d.length;i+=4){const g=d[i]*.299+d[i+1]*.587+d[i+2]*.114;const bw=g>128?255:0;d[i]=bw;d[i+1]=bw;d[i+2]=bw}ctx.putImageData(id,0,0);
+    if('BarcodeDetector' in window){const det=new BarcodeDetector({formats:await BarcodeDetector.getSupportedFormats()});const r=await det.detect(cv);if(r.length>0){scanOk(r[0].rawValue,r[0].format);found=true}}
+    if(!found){const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',.95));const f=new File([blob],'s2.jpg',{type:'image/jpeg'});const qr=new Html5Qrcode('analysisCv');const res=await qr.scanFileV2(f,true);if(res&&res.decodedText){scanOk(res.decodedText,res.result&&res.result.format?res.result.format.formatName:'unknown');found=true}qr.clear()}
+  }catch(e){}}
+  // 4: 전체 원본
+  if(!found){cv.width=img.width;cv.height=img.height;ctx.drawImage(img,0,0);
+    if('BarcodeDetector' in window){try{const det=new BarcodeDetector({formats:await BarcodeDetector.getSupportedFormats()});const r=await det.detect(cv);if(r.length>0){scanOk(r[0].rawValue,r[0].format);found=true}}catch(e){}}
+    if(!found){try{const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',.95));const f=new File([blob],'s3.jpg',{type:'image/jpeg'});const qr=new Html5Qrcode('analysisCv');const res=await qr.scanFileV2(f,true);if(res&&res.decodedText){scanOk(res.decodedText,res.result&&res.result.format?res.result.format.formatName:'unknown');found=true}qr.clear()}catch(e){}}
   }
-
-  // 3차: 크롭 이진화 후 재시도
-  if(!found){
-    try{
-      const imgData=ctx.getImageData(0,0,cropW,cropH);
-      const d=imgData.data;
-      for(let i=0;i<d.length;i+=4){const g=d[i]*.299+d[i+1]*.587+d[i+2]*.114;const bw=g>128?255:0;d[i]=bw;d[i+1]=bw;d[i+2]=bw}
-      ctx.putImageData(imgData,0,0);
-      if('BarcodeDetector' in window){
-        const det=new BarcodeDetector({formats:await BarcodeDetector.getSupportedFormats()});
-        const r=await det.detect(cv);if(r.length>0){showResult(r[0].rawValue,r[0].format);found=true}
-      }
-      if(!found){
-        const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',0.95));
-        const file=new File([blob],'s2.jpg',{type:'image/jpeg'});
-        const qr=new Html5Qrcode('analysisCv');
-        const result=await qr.scanFileV2(file,true);
-        if(result&&result.decodedText){showResult(result.decodedText,result.result&&result.result.format?result.result.format.formatName:'unknown');found=true}
-        qr.clear();
-      }
-    }catch(e){}
-  }
-
-  // 4차: 전체 원본으로 재시도 (크롭에서 못찾은 경우)
-  if(!found){
-    cv.width=img.width;cv.height=img.height;ctx.drawImage(img,0,0);
-    if('BarcodeDetector' in window){
-      try{
-        const det=new BarcodeDetector({formats:await BarcodeDetector.getSupportedFormats()});
-        const r=await det.detect(cv);if(r.length>0){showResult(r[0].rawValue,r[0].format);found=true}
-      }catch(e){}
-    }
-    if(!found){
-      try{
-        const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',0.95));
-        const file=new File([blob],'s3.jpg',{type:'image/jpeg'});
-        const qr=new Html5Qrcode('analysisCv');
-        const result=await qr.scanFileV2(file,true);
-        if(result&&result.decodedText){showResult(result.decodedText,result.result&&result.result.format?result.result.format.formatName:'unknown');found=true}
-        qr.clear();
-      }catch(e){}
-    }
-  }
-
-  if(!found){
-    document.getElementById('rcLabel').textContent='분석 실패';
-    document.getElementById('rcValue').textContent='바코드를 인식하지 못했습니다';
-    document.getElementById('rcValue').style.color='#c62828';
-    document.getElementById('rcFmt').textContent='바코드를 사진 중앙에 가로로 배치해 주세요';
-    document.getElementById('btnReg').disabled=true;
-    showToast('인식 실패 — 재촬영해 주세요');
-  }
+  if(!found){scanFail()}
 }
 
-function showResult(value,format){
-  const fmt=fmtName(format);
-  const ts=new Date().toLocaleString('ko-KR');
-  pendingCode={value,format:fmt,time:ts,ts:Date.now()};
-
-  document.getElementById('rcLabel').textContent='분석 완료';
-  document.getElementById('rcValue').textContent=value;
-  document.getElementById('rcValue').style.color='#2e7d32';
-  document.getElementById('rcFmt').textContent='형식: '+fmt;
-  document.getElementById('rcTime').textContent=ts;
-  document.getElementById('btnReg').disabled=false;
-
+function scanOk(val,fmt){
+  pendingScan={value:val,format:fmtN(fmt)};
+  const sr=document.getElementById('scanResult');sr.classList.remove('fail');
+  document.getElementById('srVal').textContent=val;
+  document.getElementById('srFmt').textContent='형식: '+fmtN(fmt);
   if(navigator.vibrate)navigator.vibrate([50,30,50]);
-  showToast('✅ '+value);
+  showToast('✅ '+val);
 }
-
-function registerCode(){
-  if(!pendingCode)return;
-  if(!hist.find(h=>h.value===pendingCode.value&&h.ts===pendingCode.ts)){
-    hist.unshift({...pendingCode});if(hist.length>200)hist.length=200;
-    localStorage.setItem('BC_HIST',JSON.stringify(hist));
-    renderHist();
-    showToast('✅ 등록: '+pendingCode.value);
-  }else{showToast('이미 등록됨')}
-  pendingCode=null;
-  document.getElementById('btnReg').disabled=true;
-  document.getElementById('rcLabel').textContent='등록 완료';
+function scanFail(){
+  pendingScan=null;
+  const sr=document.getElementById('scanResult');sr.classList.add('fail');
+  document.getElementById('srVal').textContent='인식 실패';
+  document.getElementById('srFmt').textContent='바코드를 중앙에 놓고 재촬영하세요';
+  showToast('인식 실패');
 }
+function fmtN(f){if(!f)return'?';const s=f.toString().toUpperCase();return{'QR_CODE':'QR','CODE_39':'Code39','CODE_128':'Code128','CODE_93':'Code93','EAN_13':'EAN-13','EAN_8':'EAN-8','UPC_A':'UPC-A','UPC_E':'UPC-E','ITF':'ITF','CODABAR':'Codabar','DATA_MATRIX':'DataMatrix','PDF_417':'PDF417'}[s]||s}
 
-function copyResult(){
-  const v=document.getElementById('rcValue').textContent;
-  if(!v)return;
-  navigator.clipboard.writeText(v).then(()=>showToast('복사됨')).catch(()=>{
-    const t=document.createElement('textarea');t.value=v;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);showToast('복사됨');
-  });
-}
+// ===== 저장 =====
+function saveEntry(){
+  const cat=document.getElementById('selCat').value;
+  const sub=document.getElementById('selSub').value;
+  const qty=document.getElementById('inpQty').value;
+  const note=document.getElementById('inpNote').value;
+  if(!cat){showToast('대항목을 선택하세요');return}
+  if(!sub){showToast('소항목을 선택하세요');return}
+  if(!pendingScan){showToast('바코드를 스캔하세요');return}
 
-function fmtName(f){
-  if(!f)return'?';const s=f.toString().toUpperCase();
-  return{'QR_CODE':'QR','CODE_39':'Code39','CODE_128':'Code128','CODE_93':'Code93','EAN_13':'EAN-13','EAN_8':'EAN-8','UPC_A':'UPC-A','UPC_E':'UPC-E','ITF':'ITF','CODABAR':'Codabar','DATA_MATRIX':'DataMatrix','PDF_417':'PDF417'}[s]||s;
+  const now=new Date();
+  const entry={
+    id:'E'+now.getTime(),
+    date:now.toISOString().split('T')[0],
+    time:String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0'),
+    cat,sub,
+    barcode:pendingScan.value,
+    format:pendingScan.format,
+    qty:qty||'',
+    note:note||'',
+    ts:now.toISOString()
+  };
+  hist.unshift(entry);if(hist.length>500)hist.length=500;
+  localStorage.setItem('LOT_HIST',JSON.stringify(hist));
+
+  // 초기화
+  pendingScan=null;
+  document.getElementById('scanResult').classList.remove('show');
+  document.getElementById('srImg').style.display='none';
+  document.getElementById('inpQty').value='';
+  document.getElementById('inpNote').value='';
+  showToast('✅ 등록 완료: '+entry.barcode);
 }
 
 // ===== 이력 =====
+function renderHistFilter(){
+  const fc=document.getElementById('filtCat');
+  fc.innerHTML='<option value="">전체 대항목</option>';
+  cats.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;fc.appendChild(o)});
+}
 function renderHist(){
   const c=document.getElementById('histList');document.getElementById('histCnt').textContent=hist.length;
-  if(!hist.length){c.innerHTML='<div class="h-empty">스캔 이력이 없습니다</div>';return}
+  const fc=document.getElementById('filtCat').value;
+  const fd=document.getElementById('filtDate').value;
+  let filtered=hist;
+  if(fc)filtered=filtered.filter(h=>h.cat===fc);
+  if(fd)filtered=filtered.filter(h=>h.date===fd);
+  if(!filtered.length){c.innerHTML='<div class="h-empty">이력이 없습니다</div>';return}
   c.innerHTML='';
-  hist.slice(0,100).forEach((h,i)=>{
+  filtered.slice(0,100).forEach((h,i)=>{
     const d=document.createElement('div');d.className='h-item';
-    d.innerHTML=`<div class="h-num">${i+1}</div><div class="h-body"><div class="h-val">${esc(h.value)}</div><div class="h-meta">${h.format} · ${h.time}</div></div><button class="h-cp" onclick="cpVal('${esc(h.value)}')">📋</button>`;
+    d.innerHTML=`<div class="hi-top"><span class="hi-code">${h.barcode}</span><span class="hi-time">${h.date} ${h.time}</span></div>
+      <div class="hi-tags"><span class="hi-tag ht-cat">${h.cat}</span><span class="hi-tag ht-sub">${h.sub}</span>${h.qty?'<span class="hi-tag ht-qty">수량: '+h.qty+'</span>':''}<span class="hi-tag" style="background:#f5f5f5;color:#888">${h.format}</span></div>
+      ${h.note?'<div class="hi-note">📝 '+h.note+'</div>':''}
+      <div class="hi-acts"><button class="ha-cp" onclick="cpVal('${esc(h.barcode)}')">📋복사</button><button class="ha-del" onclick="delHist('${h.id}')">🗑삭제</button></div>`;
     c.appendChild(d);
   });
 }
-function clearHist(){if(!hist.length)return;if(!confirm('전체 이력 삭제?'))return;hist.length=0;localStorage.setItem('BC_HIST','[]');renderHist()}
-function expCSV(){if(!hist.length){showToast('이력 없음');return}let csv='\uFEFF번호,바코드,형식,시간\n';hist.forEach((h,i)=>{csv+=`${i+1},"${h.value}",${h.format},"${h.time}"\n`});dlF(csv,'바코드이력.csv','text/csv;charset=utf-8')}
-function expTXT(){if(!hist.length){showToast('이력 없음');return}dlF(hist.map(h=>h.value).join('\n'),'바코드목록.txt','text/plain;charset=utf-8')}
-function dlF(c,fn,tp){const b=new Blob([c],{type:tp}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;a.click();URL.revokeObjectURL(a.href)}
+function delHist(id){if(!confirm('삭제?'))return;hist=hist.filter(h=>h.id!==id);localStorage.setItem('LOT_HIST',JSON.stringify(hist));renderHist()}
+function clearHist(){if(!hist.length)return;if(!confirm('전체 이력 삭제?'))return;hist.length=0;localStorage.setItem('LOT_HIST','[]');renderHist()}
+function esc(s){return s.replace(/'/g,'&#39;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function cpVal(v){v=v.replace(/&#39;/g,"'");navigator.clipboard.writeText(v).then(()=>showToast('복사: '+v)).catch(()=>{const t=document.createElement('textarea');t.value=v;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);showToast('복사: '+v)})}
+
+function expXlsx(){
+  if(!hist.length){showToast('이력 없음');return}
+  const wb=XLSX.utils.book_new();
+  const hd=['일자','시간','대항목','소항목','바코드','형식','수량','비고'];
+  const rows=hist.map(h=>[h.date,h.time,h.cat,h.sub,h.barcode,h.format,h.qty,h.note]);
+  const wd=[['입고 로트추적 이력'],[],hd,...rows];
+  const ws=XLSX.utils.aoa_to_sheet(wd);
+  ws['!cols']=[{wch:11},{wch:9},{wch:10},{wch:10},{wch:24},{wch:8},{wch:8},{wch:20}];
+  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:7}}];
+  XLSX.utils.book_append_sheet(wb,ws,'입고이력');
+  XLSX.writeFile(wb,`입고이력_${new Date().toISOString().split('T')[0].replace(/-/g,'')}.xlsx`);
+}
+
+// ===== 항목관리 =====
+function renderCatEditor(){
+  const c=document.getElementById('catEditor');c.innerHTML='';
+  cats.forEach((cat,ci)=>{
+    const sec=document.createElement('div');sec.className='cat-section';
+    let subsHtml=cat.subs.map((s,si)=>`<div class="sub-item">
+      <button class="s-move" onclick="moveSub(${ci},${si},-1)">▲</button>
+      <button class="s-move" onclick="moveSub(${ci},${si},1)">▼</button>
+      <input value="${s}" oninput="cats[${ci}].subs[${si}]=this.value">
+      <button class="s-del" onclick="delSub(${ci},${si})">✕</button>
+    </div>`).join('');
+    sec.innerHTML=`<div class="cat-hdr">
+      <button class="s-move" onclick="moveCat(${ci},-1)">▲</button>
+      <button class="s-move" onclick="moveCat(${ci},1)">▼</button>
+      <input value="${cat.name}" oninput="cats[${ci}].name=this.value">
+      <button class="s-del" onclick="delCat(${ci})">✕</button>
+    </div>
+    <div class="cat-body">${subsHtml}<button class="add-btn" onclick="addSub(${ci})">+ 소항목 추가</button></div>`;
+    c.appendChild(sec);
+  });
+}
+function addCat(){cats.push({name:'새 항목',subs:['소항목1']});renderCatEditor()}
+function delCat(i){if(cats.length<=1){showToast('최소 1개 필요');return}if(!confirm(cats[i].name+' 삭제?'))return;cats.splice(i,1);renderCatEditor()}
+function moveCat(i,d){const n=i+d;if(n<0||n>=cats.length)return;[cats[i],cats[n]]=[cats[n],cats[i]];renderCatEditor()}
+function addSub(ci){cats[ci].subs.push('새 소항목');renderCatEditor()}
+function delSub(ci,si){if(cats[ci].subs.length<=1){showToast('최소 1개 필요');return}cats[ci].subs.splice(si,1);renderCatEditor()}
+function moveSub(ci,si,d){const n=si+d;if(n<0||n>=cats[ci].subs.length)return;[cats[ci].subs[si],cats[ci].subs[n]]=[cats[ci].subs[n],cats[ci].subs[si]];renderCatEditor()}
+function saveCats(){localStorage.setItem('LOT_CATS',JSON.stringify(cats));renderSelects();showToast('항목 저장 완료')}
+function resetCats(){if(!confirm('기본값으로 복원?'))return;cats=JSON.parse(JSON.stringify(DEFAULT_CATS));localStorage.setItem('LOT_CATS',JSON.stringify(cats));renderCatEditor();renderSelects();showToast('기본값 복원')}
 
 let tt;function showToast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),2000)}
 
-renderHist();updateHomeInfo();
+// 초기화
+renderSelects();
 </script>
 </body>
 </html>
