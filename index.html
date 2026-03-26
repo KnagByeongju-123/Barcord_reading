@@ -95,20 +95,7 @@
   </div>
   <div class="s-cam" id="camArea">
     <div id="reader"></div>
-    <div class="s-hint" id="sHint">바코드를 가이드 안에 맞추세요</div>
-    <div class="r-ov" id="resultOv">
-      <div class="r-card">
-        <div style="font-size:11px;color:rgba(255,255,255,.5)">스캔 결과</div>
-        <div class="r-val" id="rVal"></div>
-        <div class="r-fmt" id="rFmt"></div>
-        <div class="r-tm" id="rTm"></div>
-        <div class="r-btns">
-          <button class="rb-reg" onclick="registerCode()">✅ 등록</button>
-          <button class="rb-back" onclick="resumeScan()">🔄 재스캔</button>
-          <button class="rb-copy" onclick="copyCode()">📋 복사</button>
-        </div>
-      </div>
-    </div>
+    <div class="s-hint" id="sHint">카메라에 바코드를 비추면 자동 인식됩니다</div>
   </div>
   <div class="s-bot">
     <button class="s-btn" id="btnTorch" onclick="toggleTorch()">🔦 조명</button>
@@ -173,14 +160,18 @@ async function startScanner(){
   document.getElementById('scanStatus').textContent='카메라 준비중...';
 
   const config={
-    fps:15,
+    fps:30,
     qrbox:function(vw,vh){
-      // 화면 거의 전체를 스캔 영역으로 (여백만 살짝)
       const w=Math.floor(vw*0.95);
       const h=Math.floor(vh*0.7);
       return{width:w,height:h};
     },
     aspectRatio:1.0,
+    videoConstraints:{
+      facingMode:'environment',
+      width:{ideal:3840,min:1920},
+      height:{ideal:2160,min:1080},
+    },
     formatsToSupport:[
       Html5QrcodeSupportedFormats.CODE_39,
       Html5QrcodeSupportedFormats.CODE_128,
@@ -200,8 +191,6 @@ async function startScanner(){
     showTorchButtonIfSupported:false,
     showZoomSliderIfSupported:false,
     defaultZoomValueIfSupported:2,
-    focusMode:'continuous',
-    advanced:[{focusMode:'continuous'},{zoom:2}]
   };
 
   html5Qr=new Html5Qrcode('reader');
@@ -213,7 +202,7 @@ async function startScanner(){
       onScanSuccess,
       onScanFailure
     );
-    document.getElementById('scanStatus').textContent='스캔 대기중';
+    document.getElementById('scanStatus').textContent='연속 스캔중';
 
     // 줌 범위 설정
     try{
@@ -225,10 +214,13 @@ async function startScanner(){
         zr.value=Math.min(2,caps.zoom.max||2);
         document.getElementById('zoomV').textContent=parseFloat(zr.value).toFixed(1)+'x';
       }
+      // 해상도 표시
+      const settings=html5Qr.getRunningTrackSettings();
+      if(settings)document.getElementById('sHint').textContent=settings.width+'×'+settings.height+' · 연속 스캔중';
     }catch(e){}
 
-    // 초기 줌 2x 적용
-    try{await html5Qr.applyVideoConstraints({advanced:[{zoom:2}]})}catch(e){}
+    // 초기 줌 2x
+    try{await html5Qr.applyVideoConstraints({advanced:[{zoom:2},{focusMode:'continuous'}]})}catch(e){}
 
   }catch(e){
     document.getElementById('scanStatus').textContent='카메라 오류: '+e;
@@ -248,41 +240,29 @@ function onScanSuccess(decodedText,decodedResult){
   const ts=new Date().toLocaleString('ko-KR');
   const fmt=fmtName(decodedResult.result.format?decodedResult.result.format.formatName:'unknown');
 
-  document.getElementById('rVal').textContent=decodedText;
-  document.getElementById('rFmt').textContent='형식: '+fmt;
-  document.getElementById('rTm').textContent=ts;
-  pendingCode={value:decodedText,format:fmt,time:ts,ts:now};
+  // 바로 이력에 등록 (연속 스캔)
+  const entry={value:decodedText,format:fmt,time:ts,ts:now};
+  if(!hist.find(h=>h.value===entry.value&&h.ts===entry.ts)){
+    hist.unshift(entry);if(hist.length>200)hist.length=200;
+    localStorage.setItem('BC_HIST',JSON.stringify(hist));
+  }
 
-  // 스캔 일시정지 → 결과 표시
-  try{html5Qr.pause(true)}catch(e){}
-  document.getElementById('resultOv').classList.add('show');
-  document.getElementById('scanStatus').textContent='스캔 완료';
-  document.getElementById('sHint').textContent='';
+  // 최근 결과 표시 (하단 오버레이 대신 상단 표시)
+  document.getElementById('scanStatus').textContent='✅ '+decodedText+' ('+fmt+')';
+  showToast('✅ '+decodedText);
 }
 
 function onScanFailure(err){
-  // 인식 실패는 무시 (계속 시도)
-}
-
-function registerCode(){
-  if(!pendingCode){showToast('스캔된 바코드 없음');return}
-  if(hist.find(h=>h.value===pendingCode.value&&h.ts===pendingCode.ts)){showToast('이미 등록됨');resumeScan();return}
-  hist.unshift({...pendingCode});if(hist.length>200)hist.length=200;
-  localStorage.setItem('BC_HIST',JSON.stringify(hist));
-  showToast('✅ 등록: '+pendingCode.value);
-  pendingCode=null;
-  resumeScan();
+  // 계속 시도
 }
 
 function resumeScan(){
-  document.getElementById('resultOv').classList.remove('show');
-  document.getElementById('scanStatus').textContent='스캔 대기중';
-  document.getElementById('sHint').textContent='바코드를 가이드 안에 맞추세요';
-  try{html5Qr.resume()}catch(e){}
+  // 연속 스캔이므로 별도 조작 불필요
 }
 
 function copyCode(){
-  const v=document.getElementById('rVal').textContent;if(!v)return;
+  const v=document.getElementById('scanStatus').textContent.replace('✅ ','').split(' (')[0];
+  if(!v)return;
   navigator.clipboard.writeText(v).then(()=>showToast('복사됨')).catch(()=>{
     const t=document.createElement('textarea');t.value=v;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);showToast('복사됨');
   });
