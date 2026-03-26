@@ -95,7 +95,7 @@
   </div>
   <div class="s-cam" id="camArea">
     <div id="reader"></div>
-    <div class="s-hint" id="sHint">카메라에 바코드를 비추면 자동 인식됩니다</div>
+    <div class="s-hint" id="sHint">화면을 터치하면 1회 스캔합니다</div>
   </div>
   <div class="s-bot">
     <button class="s-btn" id="btnTorch" onclick="toggleTorch()">🔦 조명</button>
@@ -158,6 +158,7 @@ async function closeScan(){
 
 async function startScanner(){
   document.getElementById('scanStatus').textContent='카메라 준비중...';
+  scanActive=false;
 
   const config={
     fps:30,
@@ -202,7 +203,6 @@ async function startScanner(){
       onScanSuccess,
       onScanFailure
     );
-    document.getElementById('scanStatus').textContent='연속 스캔중';
 
     // 줌 범위 설정
     try{
@@ -214,13 +214,19 @@ async function startScanner(){
         zr.value=Math.min(2,caps.zoom.max||2);
         document.getElementById('zoomV').textContent=parseFloat(zr.value).toFixed(1)+'x';
       }
-      // 해상도 표시
       const settings=html5Qr.getRunningTrackSettings();
-      if(settings)document.getElementById('sHint').textContent=settings.width+'×'+settings.height+' · 연속 스캔중';
+      if(settings)document.getElementById('sHint').textContent=settings.width+'×'+settings.height;
     }catch(e){}
 
     // 초기 줌 2x
     try{await html5Qr.applyVideoConstraints({advanced:[{zoom:2},{focusMode:'continuous'}]})}catch(e){}
+
+    // 바로 일시정지 (미리보기만)
+    try{html5Qr.pause(true)}catch(e){}
+    document.getElementById('scanStatus').textContent='미리보기 · 터치하면 스캔';
+
+    // 터치 이벤트
+    document.getElementById('camArea').onclick=onTapScan;
 
   }catch(e){
     document.getElementById('scanStatus').textContent='카메라 오류: '+e;
@@ -228,10 +234,36 @@ async function startScanner(){
   }
 }
 
+let scanActive=false;
+let scanTimer=null;
+
+function onTapScan(){
+  if(scanActive)return;
+  scanActive=true;
+  document.getElementById('scanStatus').textContent='스캔 중...';
+  document.getElementById('sHint').textContent='바코드를 찾고 있습니다';
+  try{html5Qr.resume()}catch(e){}
+
+  // 4초 타임아웃
+  scanTimer=setTimeout(()=>{
+    if(scanActive){
+      scanActive=false;
+      try{html5Qr.pause(true)}catch(e){}
+      document.getElementById('scanStatus').textContent='인식 실패 · 다시 터치하세요';
+      document.getElementById('sHint').textContent='바코드 위치/초점 확인 후 터치';
+      showToast('바코드를 인식하지 못했습니다');
+    }
+  },4000);
+}
+
 function onScanSuccess(decodedText,decodedResult){
+  if(!scanActive)return;
   const now=Date.now();
-  if(decodedText===lastCode&&now-lastTime<DUP_DELAY)return;
-  lastCode=decodedText;lastTime=now;
+
+  // 스캔 멈추기
+  scanActive=false;
+  if(scanTimer){clearTimeout(scanTimer);scanTimer=null}
+  try{html5Qr.pause(true)}catch(e){}
 
   // 플래시+진동
   const fl=document.getElementById('flash');fl.classList.add('on');setTimeout(()=>fl.classList.remove('on'),150);
@@ -240,32 +272,20 @@ function onScanSuccess(decodedText,decodedResult){
   const ts=new Date().toLocaleString('ko-KR');
   const fmt=fmtName(decodedResult.result.format?decodedResult.result.format.formatName:'unknown');
 
-  // 바로 이력에 등록 (연속 스캔)
+  // 결과 표시 + 이력 등록
   const entry={value:decodedText,format:fmt,time:ts,ts:now};
   if(!hist.find(h=>h.value===entry.value&&h.ts===entry.ts)){
     hist.unshift(entry);if(hist.length>200)hist.length=200;
     localStorage.setItem('BC_HIST',JSON.stringify(hist));
   }
 
-  // 최근 결과 표시 (하단 오버레이 대신 상단 표시)
   document.getElementById('scanStatus').textContent='✅ '+decodedText+' ('+fmt+')';
+  document.getElementById('sHint').textContent='등록 완료 · 다시 터치하면 재스캔';
   showToast('✅ '+decodedText);
 }
 
 function onScanFailure(err){
   // 계속 시도
-}
-
-function resumeScan(){
-  // 연속 스캔이므로 별도 조작 불필요
-}
-
-function copyCode(){
-  const v=document.getElementById('scanStatus').textContent.replace('✅ ','').split(' (')[0];
-  if(!v)return;
-  navigator.clipboard.writeText(v).then(()=>showToast('복사됨')).catch(()=>{
-    const t=document.createElement('textarea');t.value=v;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);showToast('복사됨');
-  });
 }
 
 function fmtName(f){
