@@ -94,7 +94,7 @@
   </div>
 
   <div class="card">
-    <div class="card-tit">📷 바코드 스캔 (사진 방식)</div>
+    <div class="card-tit">📷 바코드 스캔 (사진 방식) <span style="font-size:10px;color:#888;font-weight:400">여러번 촬영 가능</span></div>
     <div class="btn-row">
       <button class="btn btn-green" onclick="takePhoto()">📷 사진촬영</button>
       <button class="btn btn-blue" onclick="loadImage()">🖼 이미지</button>
@@ -103,6 +103,7 @@
       <div class="sr-val" id="srVal"></div>
       <div class="sr-fmt" id="srFmt"></div>
       <img class="sr-img" id="srImg" style="display:none">
+      <button onclick="clearBarcodeScan()" style="margin-top:6px;padding:4px 10px;border:1px solid #ddd;border-radius:6px;background:#f5f5f5;color:#888;font-size:11px;cursor:pointer;font-family:inherit">✕ 스캔 초기화</button>
     </div>
   </div>
 
@@ -263,20 +264,35 @@ async function analyzeBarcode(img){
   if(!found){scanFail()}
 }
 
+let barcodeList=[]; // 바코드 누적 배열
+
 function scanOk(val,fmt){
-  pendingScan={value:val,format:fmtN(fmt)};
-  const sr=document.getElementById('scanResult');sr.classList.remove('fail');
-  document.getElementById('srVal').textContent=val;
-  document.getElementById('srFmt').textContent='형식: '+fmtN(fmt);
+  // 중복 체크 (같은 값 방지)
+  if(!barcodeList.includes(val))barcodeList.push(val);
+  const combined=barcodeList.join(' / ');
+  pendingScan={value:combined,format:fmtN(fmt)};
+  const sr=document.getElementById('scanResult');sr.classList.remove('fail');sr.classList.add('show');
+  document.getElementById('srVal').textContent=combined;
+  document.getElementById('srFmt').textContent=barcodeList.length+'건 스캔 · 형식: '+fmtN(fmt);
   if(navigator.vibrate)navigator.vibrate([50,30,50]);
-  showToast('✅ '+val);
+  showToast('✅ '+val+' ('+barcodeList.length+'건)');
 }
 function scanFail(){
-  pendingScan=null;
-  const sr=document.getElementById('scanResult');sr.classList.add('fail');
-  document.getElementById('srVal').textContent='인식 실패';
-  document.getElementById('srFmt').textContent='바코드를 중앙에 놓고 재촬영하세요';
+  // 실패해도 기존 누적 유지
+  const sr=document.getElementById('scanResult');
+  if(!barcodeList.length){
+    sr.classList.add('fail');sr.classList.add('show');
+    document.getElementById('srVal').textContent='인식 실패';
+    document.getElementById('srFmt').textContent='바코드를 중앙에 놓고 재촬영하세요';
+  }
   showToast('인식 실패');
+}
+function clearBarcodeScan(){
+  barcodeList=[];pendingScan=null;
+  document.getElementById('scanResult').classList.remove('show','fail');
+  document.getElementById('srVal').textContent='';
+  document.getElementById('srFmt').textContent='';
+  document.getElementById('srImg').style.display='none';
 }
 function fmtN(f){if(!f)return'?';const s=f.toString().toUpperCase();return{'QR_CODE':'QR','CODE_39':'Code39','CODE_128':'Code128','CODE_93':'Code93','EAN_13':'EAN-13','EAN_8':'EAN-8','UPC_A':'UPC-A','UPC_E':'UPC-E','ITF':'ITF','CODABAR':'Codabar','DATA_MATRIX':'DataMatrix','PDF_417':'PDF417'}[s]||s}
 
@@ -375,8 +391,12 @@ function saveEntry(){
 
   // 초기화 (바코드/수량/비고만, 항목 선택은 유지)
   pendingScan=null;
-  document.getElementById('scanResult').classList.remove('show');
+  barcodeList=[];
+  document.getElementById('scanResult').classList.remove('show','fail');
+  document.getElementById('srVal').textContent='';
+  document.getElementById('srFmt').textContent='';
   document.getElementById('srImg').style.display='none';
+  document.getElementById('qrResult').classList.remove('show');
   document.getElementById('inpQty').value='';
   document.getElementById('inpNote').value='';
   showToast('✅ 등록 완료: '+entry.barcode);
