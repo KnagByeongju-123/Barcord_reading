@@ -90,14 +90,7 @@
 <div class="pnl on" id="pnl0">
   <div class="card">
     <div class="card-tit">📦 입고 등록</div>
-    <div class="fg">
-      <label>분류</label>
-      <select id="selCat" onchange="onCatChange()"><option value="">선택하세요</option></select>
-    </div>
-    <div class="fg" id="fgSub" style="display:none">
-      <label id="lblSub">세부항목</label>
-      <select id="selSub"><option value="">선택하세요</option></select>
-    </div>
+    <div id="regFields"></div>
   </div>
 
   <div class="card">
@@ -184,30 +177,20 @@ let pendingScan=null; // {value,format}
 function swTab(n){
   document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('on',i===n)});
   document.querySelectorAll('.pnl').forEach((p,i)=>{p.classList.toggle('on',i===n)});
-  if(n===0){renderSelects()}
+  if(n===0){renderRegFields()}
   if(n===1){renderHistFilter();renderHist()}
   if(n===2){renderCatEditor()}
 }
 
 // ===== 등록 탭: 항목 셀렉트 =====
-function renderSelects(){
-  const sc=document.getElementById('selCat'),ss=document.getElementById('selSub');
-  const prev=sc.value;
-  sc.innerHTML='<option value="">선택하세요</option>';
-  cats.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;sc.appendChild(o)});
-  if(prev)sc.value=prev;
-  onCatChange();
-}
-function onCatChange(){
-  const ss=document.getElementById('selSub'),fg=document.getElementById('fgSub'),lbl=document.getElementById('lblSub');
-  const catName=document.getElementById('selCat').value;
-  const cat=cats.find(c=>c.name===catName);
-  ss.innerHTML='<option value="">선택하세요</option>';
-  if(cat){
-    lbl.textContent=catName;
-    cat.subs.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;ss.appendChild(o)});
-    fg.style.display='block';
-  }else{fg.style.display='none'}
+function renderRegFields(){
+  const c=document.getElementById('regFields');
+  c.innerHTML='';
+  cats.forEach((cat,i)=>{
+    const div=document.createElement('div');div.className='fg';
+    div.innerHTML=`<label>${cat.name}</label><select id="sel_${i}"><option value="">선택하세요</option>${cat.subs.map(s=>'<option value="'+s+'">'+s+'</option>').join('')}</select>`;
+    c.appendChild(div);
+  });
 }
 
 // ===== 사진/이미지 =====
@@ -274,20 +257,26 @@ function fmtN(f){if(!f)return'?';const s=f.toString().toUpperCase();return{'QR_C
 
 // ===== 저장 =====
 function saveEntry(){
-  const cat=document.getElementById('selCat').value;
-  const sub=document.getElementById('selSub').value;
   const qty=document.getElementById('inpQty').value;
   const note=document.getElementById('inpNote').value;
-  if(!cat){showToast('분류를 선택하세요');return}
-  if(!sub){showToast('세부항목을 선택하세요');return}
   if(!pendingScan){showToast('바코드를 스캔하세요');return}
+
+  // 각 대항목별 선택값 수집
+  const fields={};
+  let hasSelection=false;
+  cats.forEach((cat,i)=>{
+    const v=document.getElementById('sel_'+i).value;
+    fields[cat.name]=v||'';
+    if(v)hasSelection=true;
+  });
+  if(!hasSelection){showToast('항목을 1개 이상 선택하세요');return}
 
   const now=new Date();
   const entry={
     id:'E'+now.getTime(),
     date:now.toISOString().split('T')[0],
     time:String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0'),
-    cat,sub,
+    fields,
     barcode:pendingScan.value,
     format:pendingScan.format,
     qty:qty||'',
@@ -303,6 +292,7 @@ function saveEntry(){
   document.getElementById('srImg').style.display='none';
   document.getElementById('inpQty').value='';
   document.getElementById('inpNote').value='';
+  cats.forEach((c,i)=>{document.getElementById('sel_'+i).value=''});
   showToast('✅ 등록 완료: '+entry.barcode);
 }
 
@@ -317,14 +307,26 @@ function renderHist(){
   const fc=document.getElementById('filtCat').value;
   const fd=document.getElementById('filtDate').value;
   let filtered=hist;
-  if(fc)filtered=filtered.filter(h=>h.cat===fc);
+  if(fc)filtered=filtered.filter(h=>{
+    // 구버전 호환 (cat 필드) + 신버전 (fields)
+    if(h.fields){return Object.values(h.fields).some(v=>v&&(h.fields[fc]||Object.keys(h.fields).includes(fc)))}
+    return h.cat===fc;
+  });
   if(fd)filtered=filtered.filter(h=>h.date===fd);
   if(!filtered.length){c.innerHTML='<div class="h-empty">이력이 없습니다</div>';return}
   c.innerHTML='';
   filtered.slice(0,100).forEach((h,i)=>{
+    let tags='';
+    if(h.fields){
+      Object.entries(h.fields).forEach(([k,v])=>{if(v)tags+=`<span class="hi-tag ht-cat">${k}: ${v}</span>`});
+    }else{
+      tags=`<span class="hi-tag ht-cat">${h.cat}</span><span class="hi-tag ht-sub">${h.sub}</span>`;
+    }
+    if(h.qty)tags+=`<span class="hi-tag ht-qty">수량: ${h.qty}</span>`;
+    tags+=`<span class="hi-tag" style="background:#f5f5f5;color:#888">${h.format}</span>`;
     const d=document.createElement('div');d.className='h-item';
     d.innerHTML=`<div class="hi-top"><span class="hi-code">${h.barcode}</span><span class="hi-time">${h.date} ${h.time}</span></div>
-      <div class="hi-tags"><span class="hi-tag ht-cat">${h.cat}</span><span class="hi-tag ht-sub">${h.sub}</span>${h.qty?'<span class="hi-tag ht-qty">수량: '+h.qty+'</span>':''}<span class="hi-tag" style="background:#f5f5f5;color:#888">${h.format}</span></div>
+      <div class="hi-tags">${tags}</div>
       ${h.note?'<div class="hi-note">📝 '+h.note+'</div>':''}
       <div class="hi-acts"><button class="ha-cp" onclick="cpVal('${esc(h.barcode)}')">📋복사</button><button class="ha-del" onclick="delHist('${h.id}')">🗑삭제</button></div>`;
     c.appendChild(d);
@@ -338,12 +340,18 @@ function cpVal(v){v=v.replace(/&#39;/g,"'");navigator.clipboard.writeText(v).the
 function expXlsx(){
   if(!hist.length){showToast('이력 없음');return}
   const wb=XLSX.utils.book_new();
-  const hd=['일자','시간','분류','세부항목','바코드','형식','수량','비고'];
-  const rows=hist.map(h=>[h.date,h.time,h.cat,h.sub,h.barcode,h.format,h.qty,h.note]);
+  const catNames=cats.map(c=>c.name);
+  const hd=['일자','시간',...catNames,'바코드','형식','수량','비고'];
+  const rows=hist.map(h=>{
+    const row=[h.date,h.time];
+    catNames.forEach(cn=>{row.push(h.fields?h.fields[cn]||'':cn===h.cat?h.sub:'')});
+    row.push(h.barcode,h.format,h.qty,h.note);
+    return row;
+  });
   const wd=[['입고 로트추적 이력'],[],hd,...rows];
   const ws=XLSX.utils.aoa_to_sheet(wd);
-  ws['!cols']=[{wch:11},{wch:9},{wch:10},{wch:10},{wch:24},{wch:8},{wch:8},{wch:20}];
-  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:7}}];
+  ws['!cols']=[{wch:11},{wch:9},...catNames.map(()=>({wch:12})),{wch:24},{wch:8},{wch:8},{wch:20}];
+  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:hd.length-1}}];
   XLSX.utils.book_append_sheet(wb,ws,'입고이력');
   XLSX.writeFile(wb,`입고이력_${new Date().toISOString().split('T')[0].replace(/-/g,'')}.xlsx`);
 }
@@ -375,13 +383,13 @@ function moveCat(i,d){const n=i+d;if(n<0||n>=cats.length)return;[cats[i],cats[n]
 function addSub(ci){cats[ci].subs.push('새 항목');renderCatEditor()}
 function delSub(ci,si){if(cats[ci].subs.length<=1){showToast('최소 1개 필요');return}cats[ci].subs.splice(si,1);renderCatEditor()}
 function moveSub(ci,si,d){const n=si+d;if(n<0||n>=cats[ci].subs.length)return;[cats[ci].subs[si],cats[ci].subs[n]]=[cats[ci].subs[n],cats[ci].subs[si]];renderCatEditor()}
-function saveCats(){localStorage.setItem('LOT_CATS',JSON.stringify(cats));renderSelects();showToast('항목 저장 완료')}
-function resetCats(){if(!confirm('기본값으로 복원?'))return;cats=JSON.parse(JSON.stringify(DEFAULT_CATS));localStorage.setItem('LOT_CATS',JSON.stringify(cats));renderCatEditor();renderSelects();showToast('기본값 복원')}
+function saveCats(){localStorage.setItem('LOT_CATS',JSON.stringify(cats));renderRegFields();showToast('항목 저장 완료')}
+function resetCats(){if(!confirm('기본값으로 복원?'))return;cats=JSON.parse(JSON.stringify(DEFAULT_CATS));localStorage.setItem('LOT_CATS',JSON.stringify(cats));renderCatEditor();renderRegFields();showToast('기본값 복원')}
 
 let tt;function showToast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),2000)}
 
 // 초기화
-renderSelects();
+renderRegFields();
 </script>
 </body>
 </html>
